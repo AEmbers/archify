@@ -157,8 +157,36 @@
         };
         return lastReceipt;
       }
+      /* When the stage runs below the viewport, the dock lifts to the viewport
+         floor so its controls stay reachable while reading. Stage-rail
+         decisions and receipts use its resting position, so the lift never
+         feeds back into layout. */
+      var lift = 0;
+      var liftFrame = 0;
+      function restingNavRect() {
+        var rect = nav.getBoundingClientRect();
+        if (!lift) return rect;
+        return { x: rect.x, y: rect.y + lift, left: rect.left, right: rect.right, top: rect.top + lift, bottom: rect.bottom + lift, width: rect.width, height: rect.height };
+      }
+      function updateLift() {
+        liftFrame = 0;
+        var next = 0;
+        if (eligible()) {
+          var rest = restingNavRect();
+          var box = container.getBoundingClientRect();
+          next = Math.round(Math.max(0, Math.min(rest.bottom - (window.innerHeight - 16), rest.top - box.top - 16)));
+        }
+        if (next === lift) return;
+        lift = next;
+        if (lift) container.style.setProperty('--archify-dock-lift', lift + 'px');
+        else container.style.removeProperty('--archify-dock-lift');
+      }
+      function scheduleLift() {
+        if (!liftFrame) liftFrame = requestAnimationFrame(updateLift);
+      }
       function measure() {
         frame = 0;
+        scheduleLift();
         if (probingBaseline) return null;
         var fixedLegend = Archify.semanticLens && Archify.semanticLens.layoutLegendDock();
         if (!eligible()) {
@@ -177,7 +205,7 @@
           if (reserve === 0 && restorableReserve > 0) {
             if (writeReserve(restorableReserve)) return null;
           }
-          var cameraNavRect = nav.getBoundingClientRect();
+          var cameraNavRect = restingNavRect();
           var cameraLegendRect = visible(legend) ? legend.getBoundingClientRect() : null;
           var cameraStageRect = protectedStageRect();
           var cameraIntersectionArea = usable(cameraLegendRect) && intersectionArea(cameraNavRect, cameraStageRect) > 0
@@ -197,7 +225,7 @@
           return lastReceipt;
         }
 
-        var navRect = nav.getBoundingClientRect();
+        var navRect = restingNavRect();
         var legendRect = visible(legend) ? legend.getBoundingClientRect() : null;
         var stageRect = protectedStageRect();
         if (!usable(navRect) || !usable(stageRect)) return clear();
@@ -220,7 +248,7 @@
           if (writeReserve(reserve + remaining)) return null;
         }
 
-        navRect = nav.getBoundingClientRect();
+        navRect = restingNavRect();
         legendRect = visible(legend) ? legend.getBoundingClientRect() : null;
         stageRect = protectedStageRect();
         stageGap = (fixedLegend ? Math.min(navRect.top, fixedLegend.getBoundingClientRect().top) : navRect.top) - stageRect.bottom;
@@ -275,7 +303,7 @@
       }
       function stableSnapshot() {
         var containerRect = container ? container.getBoundingClientRect() : { width: 0, height: 0 };
-        var navRect = nav ? nav.getBoundingClientRect() : { top: 0, left: 0 };
+        var navRect = nav ? restingNavRect() : { top: 0, left: 0 };
         var legendRect = legend ? legend.getBoundingClientRect() : { top: 0, left: 0 };
         return [
           reserve,
@@ -289,16 +317,19 @@
           lastReceipt ? lastReceipt.stageGap : ''
         ].join('|');
       }
+      function layoutPending() { return Boolean(frame || settleFrame || probingBaseline); }
       function whenStable() {
         return Archify.waitForStableLayout({
           schedule: schedule,
-          pending: function () { return Boolean(frame || settleFrame || probingBaseline); },
+          pending: layoutPending,
           snapshot: stableSnapshot,
           timeoutMessage: 'Viewer chrome layout did not reach stable dimensions.'
         });
       }
+      archifyLayoutOwners.viewerChrome = { schedule: schedule, pending: layoutPending, snapshot: stableSnapshot };
 
       window.addEventListener('resize', reprobe, { passive: true });
+      window.addEventListener('scroll', scheduleLift, { passive: true });
       window.addEventListener('load', schedule, { once: true });
       window.addEventListener('beforeprint', schedule);
       window.addEventListener('afterprint', reprobe);
@@ -309,7 +340,11 @@
       }
       if (typeof MutationObserver === 'function') {
         var contentObserver = new MutationObserver(function (records) {
-          var viewerModeChanged = records.some(function (record) { return record.target === html; });
+          // A theme switch changes paint, not the stage geometry. Reprobing
+          // drops the bottom rail for several frames and makes the diagram jump.
+          var viewerModeChanged = records.some(function (record) {
+            return record.target === html && record.attributeName !== 'data-theme';
+          });
           if (viewerModeChanged) reprobe();
           else schedule();
         });
@@ -327,6 +362,7 @@
         reprobe: reprobe,
         whenStable: whenStable,
         stageRect: protectedStageRect,
+        dockRect: function () { return nav ? restingNavRect() : null; },
         active: function () { return reserve > 0; },
         receipt: function () { return lastReceipt || measure(); }
       };

@@ -155,6 +155,7 @@
           "tag": {
             "type": "string"
           },
+          "icon": { "$ref": "common.schema.json#/$defs/nodeIcon" },
           "brand": {
             "$ref": "common.schema.json#/$defs/brandMark"
           },

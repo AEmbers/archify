@@ -297,7 +297,12 @@ test('deliver rechecks aliases immediately before committing a verified candidat
 import fs from 'node:fs';
 const [, output] = process.argv.slice(2);
 fs.writeFileSync(process.env.ARCHIFY_TEST_RENDER_STARTED, output);
-await new Promise((resolve) => setTimeout(resolve, 500));
+const release = process.env.ARCHIFY_TEST_RENDER_RELEASE;
+const deadline = Date.now() + 5000;
+while (!fs.existsSync(release) && Date.now() < deadline) {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+}
+if (!fs.existsSync(release)) throw new Error('timed out waiting for output-path race release');
 fs.writeFileSync(output, '<!doctype html><title>verified candidate</title><svg></svg>');
 `);
   fs.writeFileSync(path.join(installedScripts, 'check-render-output.mjs'), `
@@ -323,6 +328,7 @@ console.log(JSON.stringify({
   const source = Buffer.from('{"meta":{"title":"race input","output":"diagram.html"}}');
   fs.writeFileSync(input, source);
   const marker = path.join(cwd, 'renderer-started');
+  const release = path.join(cwd, 'renderer-release');
 
   const child = spawn(process.execPath, [
     path.join(installedBin, 'archify.mjs'),
@@ -330,9 +336,14 @@ console.log(JSON.stringify({
   ], {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, ARCHIFY_TEST_RENDER_STARTED: marker },
+    env: {
+      ...process.env,
+      ARCHIFY_TEST_RENDER_STARTED: marker,
+      ARCHIFY_TEST_RENDER_RELEASE: release,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+  const close = new Promise((resolve) => child.once('close', resolve));
   let stdout = '';
   let stderr = '';
   child.stdout.setEncoding('utf8');
@@ -348,8 +359,10 @@ console.log(JSON.stringify({
   // Staging stays in the physical output directory when this alias is retargeted.
   fs.unlinkSync(linkedDirectory);
   fs.symlinkSync(inputDirectory, linkedDirectory, 'dir');
+  assert.equal(fs.realpathSync(linkedDirectory), fs.realpathSync(inputDirectory));
+  fs.writeFileSync(release, 'release');
 
-  const status = await new Promise((resolve) => child.once('close', resolve));
+  const status = await close;
 
   assert.equal(status, 1, stderr);
   const receipt = JSON.parse(stdout);

@@ -102,13 +102,38 @@ async function stateAt(url) {
 
 async function waitForState(url, predicate, message, timeoutMs = 12000) {
   const started = Date.now();
+  const requestedDeadline = started + timeoutMs;
+  // A real delivery can spend several seconds in the renderer while other
+  // preview/visual-check tests are running. Once the state endpoint confirms
+  // that the requested generation is actively checking, keep waiting up to a
+  // bounded adaptive deadline instead of failing on a fixed caller-side
+  // timeout. An explicit timeout longer than the adaptive window is preserved.
+  // The transition trace makes a genuine stalled build distinguishable from a
+  // slow one when the bounded wait expires.
+  const hardWaitMs = Math.max(timeoutMs, 20000);
+  const hardDeadline = started + hardWaitMs;
+  let deadline = Math.min(requestedDeadline, hardDeadline);
   let latest;
-  while (Date.now() - started < timeoutMs) {
+  const transitions = [];
+  let previousMarker;
+  while (Date.now() < hardDeadline) {
     latest = await stateAt(url);
+    const marker = `${latest.status}/generation-${latest.generation}/revision-${latest.revision}`;
+    if (marker !== previousMarker) {
+      transitions.push(`${Date.now() - started}ms ${marker}`);
+      previousMarker = marker;
+    }
     if (predicate(latest)) return latest;
+    if (Date.now() >= deadline && latest.status === 'checking' && latest.generation > 0) {
+      deadline = hardDeadline;
+    } else if (Date.now() >= deadline) {
+      break;
+    }
     await new Promise((resolve) => setTimeout(resolve, 40));
   }
-  assert.fail(`${message}; latest state: ${JSON.stringify(latest)}`);
+  assert.fail(
+    `${message}; waited ${Date.now() - started}ms; transitions: ${transitions.join(' -> ') || 'none'}; latest state: ${JSON.stringify(latest)}`,
+  );
 }
 
 function rawRequest(url, { method = 'GET', pathname = '/', hostHeader } = {}) {

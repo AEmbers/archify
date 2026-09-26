@@ -80,7 +80,7 @@ function workflowStep(workflow, name) {
 }
 
 function workflowJob(workflow, name) {
-  const marker = `  ${name}:`;
+  const marker = `\n  ${name}:\n`;
   const start = workflow.indexOf(marker);
   assert.notEqual(start, -1, `workflow is missing the "${name}" job`);
   const next = workflow.slice(start + marker.length).search(/\n  [a-z][a-z0-9-]*:\n/);
@@ -213,11 +213,12 @@ test('release docs disclose that mutable Release assets are verified only at dep
   assert.doesNotMatch(design, /即使 Release 资产后来可被替换，也不能脱离/);
 });
 
-test('GitHub Pages deploys docs only after every repository gate succeeds', () => {
+test('GitHub Pages deploys the verified website artifact only after every repository gate succeeds', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
   const job = workflowJob(workflow, 'deploy-pages');
+  assert.match(workflow, /push:\n    branches: \[main, dev\]/);
   assert.match(job, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
-  assert.match(job, /needs: \[test, webm-artifact, zip-freshness, published-update-manifest, package-smoke, windows-test-portability\]/);
+  assert.match(job, /needs: \[test, webm-artifact, zip-freshness, published-update-manifest, package-smoke, windows-test-portability, website\]/);
   assert.match(job, /pages: write/);
   assert.match(job, /id-token: write/);
   assert.match(job, /repos\/\$\{GITHUB_REPOSITORY\}\/git\/ref\/heads\/main/);
@@ -237,13 +238,42 @@ test('GitHub Pages deploys docs only after every repository gate succeeds', () =
     'fc324d3547104276b827a68afc52ff2a11cc49c9',
     'v5.0.0',
   );
-  assert.match(job, /path: docs/);
+  assertPinnedAction(
+    job,
+    'actions/download-artifact',
+    'd3f86a106a0bac45b974a628896c90dbdf5c8093',
+    'v4.3.0',
+  );
+  assert.match(job, /name: website-dist/);
+  assert.match(job, /path: website\/dist/);
   assertPinnedAction(
     job,
     'actions/deploy-pages',
     'cd2ce8fcbc39b97be8ca5fce6e763baed58fa128',
     'v5.0.0',
   );
+  const website = workflowJob(workflow, 'website');
+  assert.match(website, /npm run check && npm run build && npm test/);
+  assert.match(website, /ARCHIFY_SITE_ROOT:.*website\/dist/);
+  assertPinnedAction(
+    website,
+    'actions/upload-artifact',
+    '65462800fd760344b1a7b4382951275a0abb4808',
+    'v4.3.3',
+  );
+  assert.match(website, /name: website-dist/);
+  const browser = workflowJob(workflow, 'webm-artifact');
+  assert.match(browser, /Run shared browser regression gate/);
+  assert.match(browser, /npm run test:browser/);
+  const renderer = workflowJob(workflow, 'test');
+  assert.match(renderer, /Verify community Hermes adapter/);
+  const packageSmoke = workflowJob(workflow, 'package-smoke');
+  assert.match(packageSmoke, /Verify delivery-lock ownership with real subprocesses/);
+  assert.match(packageSmoke, /Verify macOS opener stays behind delivery-lock release/);
+  const windows = workflowJob(workflow, 'windows-test-portability');
+  assert.match(windows, /node-version: \[22, 24\]/);
+  assert.match(windows, /Verify maintained Windows path contracts/);
+  assert.match(windows, /ARCHIFY_REQUIRE_WINDOWS_REAL_PATHS: '1'/);
 });
 
 test('release tags with a SemVer prerelease are marked prerelease and never become latest', () => {
@@ -1502,6 +1532,7 @@ test('CI and tagged releases share the maintained Windows path contract on Node 
     'test/open-artifact.test.mjs',
     'test/repository-evidence.test.mjs',
     'test/renderer-atomic-write.test.mjs',
+    'test/atomic-output-recovery.test.mjs',
   ];
   for (const suite of fullSuites) {
     assert.ok(runner.includes(`'${suite}'`), `shared runner must execute ${suite}`);
@@ -1634,14 +1665,18 @@ test('CI and tagged releases share the maintained Windows path contract on Node 
     assert.match(job, /node-version:\s*\$\{\{ matrix\.node-version \}\}/);
     assert.match(job, /npm ci --ignore-scripts/);
     assert.match(job, /node scripts\/run-windows-path-tests\.mjs/);
-    assert.match(job, /name: Provision controlled Windows path fixtures\n\s+shell: pwsh/);
+    assert.match(job, label === 'CI'
+      ? /name: Provision controlled Windows path fixtures\n\s+if: needs\.scope\.outputs\.scope == 'full'\n\s+shell: pwsh/
+      : /name: Provision controlled Windows path fixtures\n\s+shell: pwsh/);
     assert.match(
       job,
       /scripts\/windows-path-fixtures[.]ps1 -NodeVersion '\$\{\{ matrix[.]node-version \}\}'/,
     );
     assert.match(
       job,
-      /name: Clean up controlled Windows path fixtures\n\s+if: \$\{\{ always\(\) \}\}/,
+      label === 'CI'
+        ? /name: Clean up controlled Windows path fixtures\n\s+if: \$\{\{ always\(\) && needs\.scope\.outputs\.scope == 'full' \}\}/
+        : /name: Clean up controlled Windows path fixtures\n\s+if: \$\{\{ always\(\) \}\}/,
     );
     assert.match(
       job,

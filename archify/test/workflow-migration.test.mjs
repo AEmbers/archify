@@ -31,7 +31,7 @@ function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function runMigration(source, destination, { importModule, env } = {}) {
+function runMigration(source, destination, { importModule, env, output } = {}) {
   return spawnSync(process.execPath, [
     ...(importModule ? ['--import', pathToFileURL(importModule).href] : []),
     cli,
@@ -41,6 +41,7 @@ function runMigration(source, destination, { importModule, env } = {}) {
     destination,
     '--to-schema',
     '2',
+    ...(output !== undefined ? ['--output', output] : []),
     '--json',
   ], {
     encoding: 'utf8',
@@ -251,6 +252,68 @@ test('CLI atomically commits a capacity-expanded migration and preserves source 
   });
   assert.deepEqual(report.migrationDiagnostics, []);
   assert.deepEqual(report.newSchemaDiagnostics, []);
+});
+
+test('CLI migration can repair a missing legacy output only in the v2 destination', () => {
+  const source = copyFixture('missing-output-source.workflow.json', (workflow) => {
+    delete workflow.meta.output;
+    return workflow;
+  });
+  const destination = path.join(tmp, 'missing-output-destination.workflow.json');
+  const sourceBytes = fs.readFileSync(source);
+
+  const withoutReplacement = runMigration(source, destination);
+  assert.notEqual(withoutReplacement.status, 0);
+  assert.equal(fs.existsSync(destination), false);
+  assert.deepEqual(fs.readFileSync(source), sourceBytes);
+
+  const result = runMigration(source, destination, { output: 'migrated/legacy-workflow.html' });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.deepEqual(fs.readFileSync(source), sourceBytes, 'migration must not repair the source in place');
+  const migrated = JSON.parse(fs.readFileSync(destination, 'utf8'));
+  assert.equal(migrated.meta.output, 'migrated/legacy-workflow.html');
+  assert.equal(migrated.schema_version, 2);
+  assert.equal(parseJsonOutput(result).ok, true);
+});
+
+test('CLI migration repairs an invalid legacy output only with an explicit portable replacement', () => {
+  const source = copyFixture('invalid-output-source.workflow.json', (workflow) => {
+    workflow.meta.output = '/tmp/legacy-workflow.html';
+    return workflow;
+  });
+  const destination = path.join(tmp, 'invalid-output-destination.workflow.json');
+  const sourceBytes = fs.readFileSync(source);
+
+  const result = runMigration(source, destination, { output: 'migrated/portable-workflow.html' });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.deepEqual(fs.readFileSync(source), sourceBytes);
+  assert.equal(JSON.parse(fs.readFileSync(destination, 'utf8')).meta.output, 'migrated/portable-workflow.html');
+
+  const rejectedDestination = path.join(tmp, 'invalid-replacement-destination.workflow.json');
+  const rejected = runMigration(source, rejectedDestination, { output: '/tmp/not-portable.html' });
+  assert.notEqual(rejected.status, 0);
+  assert.equal(fs.existsSync(rejectedDestination), false);
+  assert.deepEqual(fs.readFileSync(source), sourceBytes);
+  assert.ok(parseJsonOutput(rejected).diagnostics.some(({ code }) => code.startsWith('output/')));
+});
+
+test('CLI migration replacement does not hide malformed non-output schema errors', () => {
+  const source = copyFixture('malformed-non-output-source.workflow.json', (workflow) => {
+    delete workflow.meta.title;
+    delete workflow.meta.output;
+    return workflow;
+  });
+  const destination = path.join(tmp, 'malformed-non-output-destination.workflow.json');
+  const sourceBytes = fs.readFileSync(source);
+
+  const result = runMigration(source, destination, { output: 'migrated/repaired-output.html' });
+  assert.notEqual(result.status, 0);
+  assert.equal(fs.existsSync(destination), false);
+  assert.deepEqual(fs.readFileSync(source), sourceBytes);
+  const failure = parseJsonOutput(result);
+  assert.ok(failure.diagnostics.some(({ code, subject }) => (
+    !code.startsWith('output/') && subject?.path === '/meta'
+  )), JSON.stringify(failure.diagnostics, null, 2));
 });
 
 test('column-capacity diagnostics do not advertise migration across a quality-profile divergence', () => {

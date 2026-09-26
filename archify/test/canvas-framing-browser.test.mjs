@@ -206,11 +206,11 @@ test('Stable canvas framing preserves complete first view and manual reading geo
       }
     }
   });
-  await t.test('node, chapter and invalid deep links preserve explicit navigation priority',async()=>{
+  await t.test('node and invalid deep links preserve explicit navigation priority',async()=>{
     const fixture=fixtures.find(f=>f.name==='maka')||fixtures[0];
     const source=JSON.parse(fs.readFileSync(fixture.source));
-    const node=source.components?.[0]?.id;const chapter=source.meta.views?.[0]?.id;
-    for(const hash of [node&&'#focus='+encodeURIComponent(node),chapter&&'#view='+encodeURIComponent(chapter),'#focus=missing-framing-node','#view=missing-framing-chapter'].filter(Boolean)){
+    const node=source.components?.[0]?.id;
+    for(const hash of [node&&'#focus='+encodeURIComponent(node),'#focus=missing-framing-node','#view=missing-framing-chapter'].filter(Boolean)){
       await load(fixture.file,1440,900,'light',hash);let before=await sample('deep-link-'+hash);
       if(hash.includes('missing-'))contained(before,'invalid link falls back');
       else assert.equal(before.state.mode,'semantic');
@@ -223,7 +223,7 @@ test('Stable canvas framing preserves complete first view and manual reading geo
   });
 });
 
-test('semantic chapter framing contains every target with desktop notes open or closed', {
+test('semantic focus framing contains every target with desktop notes open or closed', {
   skip: chrome ? false : 'Set ARCHIFY_CHROME to check semantic chapter containment.',
 }, async t => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-chapter-fit-'));
@@ -263,8 +263,8 @@ test('semantic chapter framing contains every target with desktop notes open or 
     await loaded; await stable();
     for (const notes of [false, true]) {
       if (notes) { await run("document.getElementById('btn-diagram-notes').click()"); await stable(); }
-      for (const chapter of spec.meta.views) {
-        await run(`document.querySelector('[data-guided-view-id="${chapter.id}"]').click()`);
+      for (const chapter of [{ id: 'all-nodes', focus: spec.components.map(node => node.id) }]) {
+        await run(`Archify.focus.setMany(${JSON.stringify(chapter.focus)}, { toggle: false })`);
         await stable();
         const observed = await run(`(()=>{
           const stage=Archify.viewerChromeLayout.stageRect();

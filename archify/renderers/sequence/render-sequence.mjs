@@ -343,7 +343,7 @@ function renderParticipant(participant) {
           ${focusNodeTitle(participant.label, passport)}
           <rect x="${participant.x}" y="${layout.topY}" width="${layout.participantW}" height="${layout.participantH}" rx="6" class="c-mask"/>
           <rect x="${participant.x}" y="${layout.topY}" width="${layout.participantW}" height="${layout.participantH}" rx="6" class="${fill}"${animateAttr(sequence.meta, 'node', participant.index)} stroke-width="1.5"/>
-          ${renderSemanticSigil(participant.type, { x: participant.x + 6, y: layout.topY + 6 })}${brand ? `\n          ${brand}` : ''}
+          ${renderSemanticSigil(participant.type, { icon: participant.icon, x: participant.x + 6, y: layout.topY + 6 })}${brand ? `\n          ${brand}` : ''}
           <text data-node-label=""${hasSub ? ' data-detail-anchor=""' : ''} x="${participant.cx}" y="${layout.topY + layout.participantLabelY}" class="t-primary" font-size="${labelFontSize}" font-weight="600" text-anchor="middle">${esc(participant.label)}</text>${sub}
         </g>`;
 }
@@ -439,7 +439,11 @@ function renderLegend() {
 
 function renderSvg() {
   const participantList = [...participants.values()];
-  return `      <svg viewBox="0 0 ${viewBox[0]} ${viewBox[1]}" ${svgRootAttrs(sequence.meta)}>
+  // Same default-canvas contract as lifecycle: 920x760 is below the 1.55 wide
+  // ratio, so without intrinsic-height the desktop Reader can neither narrow
+  // nor scroll it and every default sequence fails the browser gate.
+  const readerFit = sequence.meta?.viewBox ? '' : ' data-reader-fit="intrinsic-height"';
+  return `      <svg viewBox="0 0 ${viewBox[0]} ${viewBox[1]}"${readerFit} ${svgRootAttrs(sequence.meta)}>
 ${svgAccessibleText(sequence.meta, 'sequence')}
 ${renderDefinitions()}
 

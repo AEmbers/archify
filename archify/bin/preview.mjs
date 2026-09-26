@@ -947,7 +947,7 @@ export async function runPreview(options) {
   console.log(`watching ${preview.input}`);
   console.log(`output ${preview.output}`);
   if (preview.opener && preview.opener.status !== 'opened') {
-    console.error(`Could not open the preview (${preview.opener.status}). Open it manually: ${preview.url}`);
+    console.error(`Could not open the preview (${preview.opener.status}). ${preview.opener.failure?.reason || 'Open it manually.'} Target: ${preview.url}`);
   }
 
   let signalCount = 0;

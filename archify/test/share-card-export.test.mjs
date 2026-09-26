@@ -48,8 +48,8 @@ test('all five renderers expose one explicit 1200x630 Share Card export', () => 
 
 test('Share Card uses contain-only canonical geometry with fixed safe areas', () => {
   const html = render('architecture');
-  assert.match(html, /var availableWidth = SHARE_CARD_WIDTH - SHARE_CARD_PADDING \* 2;/);
-  assert.match(html, /var availableHeight = SHARE_CARD_HEIGHT - SHARE_CARD_HEADER - SHARE_CARD_PADDING;/);
+  assert.match(html, /var panelWidth = SHARE_CARD_WIDTH - SHARE_CARD_PADDING \* 2;[\s\S]*?var availableWidth = panelWidth - inset \* 2;/);
+  assert.match(html, /var panelHeight = SHARE_CARD_HEIGHT - SHARE_CARD_HEADER - SHARE_CARD_PADDING;[\s\S]*?var availableHeight = panelHeight - inset \* 2;/);
   assert.match(html, /var fit = Math\.min\(availableWidth \/ data\.width, availableHeight \/ data\.height\);/);
   assert.match(html, /ctx\.drawImage\(img, drawX, drawY, drawWidth, drawHeight\);/);
   assert.match(html, /function canvas2dOrThrow\(canvas, label\)/);
@@ -57,7 +57,7 @@ test('Share Card uses contain-only canonical geometry with fixed safe areas', ()
   assert.match(html, /throw exportError\('viewer\.export\.error\.toBlobUnavailable'/);
   assert.match(html, /img\.onload = function \(\) \{\s*try \{/);
   assert.match(html, /function rasterizeShareCard\(options\)[\s\S]*?if \(!options\.variant\) return renderShareCard\(\);/);
-  assert.match(html, /function renderShareCard\(options\)[\s\S]*?serializeSvg\(sourceScale, \{ routeSnapshot: routeSnapshot, reachSnapshot: reachSnapshot \}\)/);
+  assert.match(html, /function renderShareCard\(options\)[\s\S]*?serializeSvg\(sourceScale, \{ routeSnapshot: routeSnapshot, reachSnapshot: reachSnapshot, figure: true \}\)/);
   assert.match(html, /fitCanvasText\(ctx, title, [^)]+\)/);
   assert.match(html, /ARCHIFY ·/);
   assert.doesNotMatch(svgBlock(html), /share-card|Share Card|ARCHIFY ·/);
@@ -109,7 +109,7 @@ test('Share Card stays viewer-only and reuses export cleanup instead of source s
   assert.match(html, /html\[data-embed="true"\] \.toolbar/);
   assert.match(html, /@media print[\s\S]*?\.toolbar/);
   assert.match(html, /function rasterizeShareCard\(options\)[\s\S]*?if \(!options\.variant\) return renderShareCard\(\);/);
-  assert.match(html, /function renderShareCard\(options\)[\s\S]*?serializeSvg\(sourceScale, \{ routeSnapshot: routeSnapshot, reachSnapshot: reachSnapshot \}\)/);
+  assert.match(html, /function renderShareCard\(options\)[\s\S]*?serializeSvg\(sourceScale, \{ routeSnapshot: routeSnapshot, reachSnapshot: reachSnapshot, figure: true \}\)/);
   assert.match(html, /if \(!data\.canonicalStateClean\) return Promise\.reject\(exportError\('viewer\.export\.error\.viewerState'\)\);/);
   assert.match(html, /canonicalStateClean/);
   assert.doesNotMatch(svgBlock(html), /data-last-export-|data-format="share-card"/);
@@ -122,7 +122,7 @@ test('the skill and every README make the optional Share Card discoverable', () 
   assert.match(viewer, /never claim(?:s|ing)? validation/i);
   assert.match(viewer, /Copy Share Card/i);
 
-  for (const readme of ['README.md', 'README_EN.md', 'README_ZH.md']) {
+  for (const readme of ['README.md', 'README_EN.md', 'README_ZH.md', 'README_JA.md']) {
     const text = fs.readFileSync(path.join(repoRoot, readme), 'utf8');
     assert.match(text, /Share Card/i, readme);
     assert.match(text, /1200(?:×|x)630/, readme);
