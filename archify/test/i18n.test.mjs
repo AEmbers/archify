@@ -22,6 +22,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillRoot = path.resolve(__dirname, '..');
 const cli = path.join(skillRoot, 'bin/archify.mjs');
 const templatePath = path.join(skillRoot, 'assets/template.html');
+const ES_TRANSLATIONS = JSON.parse(fs.readFileSync(path.join(skillRoot, 'examples/locales/es.json'), 'utf8'));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-i18n-'));
 const chromePath = process.env.ARCHIFY_CHROME ? findChrome() : null;
 let sequence = 0;
@@ -151,7 +152,7 @@ async function loadArtifact(browser, artifactPath) {
 }
 
 test('zh-CN localizes renderer-owned output across all five modes without translating authored content', () => {
-  assert.deepEqual(SUPPORTED_LOCALES, ['en', 'zh-CN', 'es']);
+  assert.deepEqual(SUPPORTED_LOCALES, ['en', 'zh-CN']);
   for (const type of Object.keys(EXAMPLES)) {
     const document = example(type);
     const authoredTitle = document.meta.title;
@@ -173,14 +174,13 @@ test('zh-CN localizes renderer-owned output across all five modes without transl
   }
 });
 
-test('es localizes renderer-owned output across all five modes without translating authored content', () => {
-  // es must keep working as a built-in catalog: it ships on dev independently
-  // of meta.translations, and this PR's mechanism must not regress it to an
-  // English fallback once merged (see tt-a1i's review on #457).
+test('supplied es catalog localizes renderer-owned output across all five modes without translating authored content', () => {
+  assert.equal(validateTranslations(ES_TRANSLATIONS).coverage, 1);
   for (const type of Object.keys(EXAMPLES)) {
     const document = example(type);
     const authoredTitle = document.meta.title;
     document.meta.locale = 'es';
+    document.meta.translations = ES_TRANSLATIONS;
     delete document.meta.subtitle;
 
     const result = run(type, document);
@@ -458,7 +458,7 @@ test('malformed locale tags fail schema validation in every mode', () => {
 });
 
 test('a well-formed but unregistered locale passes validation, falls back to English chrome, and discloses the fallback', () => {
-  for (const locale of ['fr', 'zh-HK']) {
+  for (const locale of ['fr', 'zh-HK', 'es']) {
     for (const type of Object.keys(EXAMPLES)) {
       const document = example(type);
       document.meta.locale = locale;
@@ -562,6 +562,7 @@ async function assertLocalizedViewer(browser, locale, expected) {
   for (const type of Object.keys(EXAMPLES)) {
     const document = example(type);
     document.meta.locale = locale;
+    if (locale === 'es') document.meta.translations = ES_TRANSLATIONS;
     const authoredTitle = expected.title(type);
     document.meta.title = authoredTitle;
     const result = run(type, document);

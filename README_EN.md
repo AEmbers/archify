@@ -341,7 +341,7 @@ Settings:
 }
 ```
 
-`meta.locale` localizes page title, Legend, states/errors, a11y, HTML/SVG `lang`—never authored content. `en`/`zh-CN`/`es` are built in; any other tag needs `meta.translations` (canonical message key → translated string; see `examples/locales/ko.json`), or the renderer falls back to English and discloses it. Static omits `animation`; `classic` defaults.
+`meta.locale` localizes page title, Legend, states/errors, a11y, HTML/SVG `lang`—never authored content. `en`/`zh-CN` are built in; other languages, including Spanish (`es`), need `meta.translations` (canonical message key → translated string; see `examples/locales/es.json`), or the renderer falls back to English and discloses it. Static omits `animation`; `classic` defaults.
 
 </details>
 

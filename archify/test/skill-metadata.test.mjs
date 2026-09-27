@@ -64,7 +64,7 @@ test('update awareness is notification-only and never replaces the requested wor
 test('language behavior stays within the bounded locale contract', () => {
   assert.match(defaults, /one primary authored language/);
   assert.match(defaults, /user's choice or the request\/conversation/);
-  assert.match(defaults, /English \(`en`\), Simplified Chinese \(`zh-CN`\), or Spanish \(`es`\)/);
+  assert.match(defaults, /English \(`en`\) or Simplified Chinese \(`zh-CN`\)/);
   assert.match(defaults, /meta\.translations/);
   assert.match(defaults, /exact product, code, protocol, command, API, and environment names/);
   assert.match(defaults, /Language consistency\]\(authoring-contract\.md#language-consistency\)/);

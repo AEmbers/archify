@@ -4,7 +4,6 @@
   "meta": {
     "title": "Deployment Release Lifecycle",
     "output": "examples/deployment-release.html",
-    "viewBox": [980, 680],
     "animation": "trace",
     "visual_preset": "signal-flow",
     "quality_profile": "showcase"

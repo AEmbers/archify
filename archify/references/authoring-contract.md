@@ -75,17 +75,21 @@ legend label overrides, and cards. A bilingual diagram still
 chooses one primary locale for the Viewer; follow an explicit primary-language
 request, then prompt order or conversation dominance.
 
-`en`, `zh-CN`, and `es` are built-in Viewer catalogs and need nothing further. For
+`en` and `zh-CN` are built-in Viewer catalogs and need nothing further. For
 every other `meta.locale`, also set `meta.translations`: an object mapping the
 renderer's canonical message keys (`catalogKeys()` in
 `renderers/shared/i18n.mjs`) to translated strings whose `{placeholder}` tokens
 match the English source exactly. Reuse suitable translations from `examples/locales/` or a previously reviewed
-catalog. Translate missing keys or adapt terminology when the diagram needs it;
+catalog; Spanish uses `examples/locales/es.json`. Translate missing keys or adapt terminology when the diagram needs it;
 use the English source to check keys and placeholders. Example catalogs may
 lag new Viewer keys; validation reports those gaps and uses English for them. A key that is missing, unrecognized, or has mismatched
 placeholders falls back to its English string — `validate`/`render`/`deliver`
 report the resulting coverage to stderr — rather than breaking the render or
 silently shipping an untranslated string as if it were translated.
+
+For older dev inputs using only `meta.locale: "es"`, copy the Spanish catalog
+into `meta.translations` before rendering again. Existing standalone HTML
+keeps its embedded translations.
 
 For a requested language you cannot supply `meta.translations` for, do not
 write a `meta.locale` with no built-in catalog and no translations. Keep every

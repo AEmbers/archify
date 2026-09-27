@@ -25,7 +25,7 @@ const outputPathGuards = new Map();
 let renderCandidateSequence = 0;
 
 // meta.locale is renderer-owned Viewer UI, not authored content.
-// en, zh-CN, and es ship as built-in catalogs.
+// en and zh-CN ship as built-in catalogs.
 // Any other tag needs meta.translations (validated against the English
 // message-key set, layered over English per-key so partial/invalid entries
 // never break rendering) or it falls back to the English Viewer chrome —

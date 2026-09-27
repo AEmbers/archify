@@ -24,8 +24,8 @@ in generated HTML. Omit it, or set `"none"`, for the default static output.
 It also accepts `locale`, any well-formed language tag (schema pattern
 `^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$`). The field selects the fixed Viewer UI,
 renderer-owned default legend and accessibility copy, document-title suffix,
-and `<html lang>` value; it does not translate authored strings. `en`,
-`zh-CN`, and `es` are built-in catalogs; any other tag needs a matching `translations`
+and `<html lang>` value; it does not translate authored strings. `en` and
+`zh-CN` are built-in catalogs; any other tag needs a matching `translations`
 object (see below) or the renderer falls back to English and discloses it.
 Omitting `locale` preserves legacy behavior and resolves to English.
 Malformed locale tags fail schema validation instead of being guessed or
@@ -37,7 +37,9 @@ built-in catalog, as data: an object mapping canonical message keys (see
 `{placeholder}` tokens match the English source. A key that is missing,
 unrecognized, or has mismatched placeholders falls back to English rather than
 failing the render; `validate`/`render`/`deliver` report the resulting
-coverage to stderr.
+coverage to stderr. Spanish uses the reusable `examples/locales/es.json`
+catalog; dev inputs that previously used only `locale: "es"` now need this
+object in `meta.translations` to retain Spanish UI.
 `visual_preset` accepts `classic` (the stable default), `signal-flow` (luminous
 motion-forward presentation), `blueprint` (high-contrast engineering review),
 or `editorial` (warm publication-style design review and documentation).
@@ -159,7 +161,7 @@ The five diagram schemas reference `common.schema.json#/$defs/...`:
 - `point` — an `[x, y]` pair of numbers (used by `via` and `labelAt`)
 - `componentType` — `frontend`, `backend`, `database`, `cloud`, `security`,
   `messagebus`, `external`
-- `locale` — a well-formed renderer locale tag (`en`, `zh-CN`, and `es` are built in;
+- `locale` — a well-formed renderer locale tag (`en` and `zh-CN` are built in;
   any other tag needs a matching `translations` object)
 - `translations` — canonical message key → translated string, for a `locale`
   with no built-in catalog
