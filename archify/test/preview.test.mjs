@@ -439,17 +439,33 @@ console.log(JSON.stringify({
   }
 });
 
-test('preview: commit rechecks the live digest when watcher and poll have not seen a newer save', { timeout: 10000 }, async () => {
+test('preview: commit rechecks the live digest when watcher and poll have not seen a newer save', { timeout: 10000 }, async (t) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-preview-commit-race-'));
   const input = path.join(tmp, 'diagram.json');
   const output = path.join(tmp, 'diagram.html');
   const deliveryCli = path.join(tmp, 'commit-race-delivery.mjs');
+  const releaseA = path.join(tmp, 'release-a');
+  const releaseB = path.join(tmp, 'release-b');
+  const startedA = path.join(tmp, 'started-a');
+  const startedB = path.join(tmp, 'started-b');
+  let notifyChange;
+  t.mock.method(fs, 'watch', (_directory, callback) => {
+    notifyChange = callback;
+    const watcher = new EventEmitter();
+    watcher.close = () => {};
+    return watcher;
+  });
   fs.writeFileSync(deliveryCli, `
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 const [, , input, output] = process.argv.slice(2);
 const source = JSON.parse(fs.readFileSync(input, 'utf8'));
-await new Promise((resolve) => setTimeout(resolve, source.title === 'Prior Good' ? 30 : 260));
+const intermediate = source.title === 'Intermediate A';
+if (intermediate || source.title === 'Current B') {
+  fs.writeFileSync(intermediate ? ${JSON.stringify(startedA)} : ${JSON.stringify(startedB)}, 'ready');
+  const release = intermediate ? ${JSON.stringify(releaseA)} : ${JSON.stringify(releaseB)};
+  while (!fs.existsSync(release)) await new Promise(resolve => setTimeout(resolve, 10));
+}
 const artifact = Buffer.from('<!doctype html><title>' + source.title + '</title><svg></svg>');
 fs.writeFileSync(output, artifact);
 console.log(JSON.stringify({
@@ -466,22 +482,25 @@ console.log(JSON.stringify({
     output,
     open: false,
     debounceMs: 10,
-    pollMs: 800,
-    watch: false,
+    // Notify A explicitly; B must be discovered by the commit digest recheck.
+    pollMs: 60000,
     deliveryCli,
   });
   try {
     await waitForState(preview.url, (state) => state.status === 'verified' && state.revision === 1, 'prior good revision did not verify');
     const priorArtifact = fs.readFileSync(output, 'utf8');
     fs.writeFileSync(input, JSON.stringify({ title: 'Intermediate A' }));
-    await waitForState(preview.url, (state) => state.status === 'checking' && state.generation === 2, 'intermediate generation did not start');
+    notifyChange('change', path.basename(input));
+    await waitForPath(startedA, 'intermediate delivery did not start');
     fs.writeFileSync(input, JSON.stringify({ title: 'Current B' }));
 
-    await new Promise((resolve) => setTimeout(resolve, 340));
+    fs.writeFileSync(releaseA, 'release');
+    await waitForPath(startedB, 'commit did not discover the unobserved newer save');
     assert.equal(fs.readFileSync(output, 'utf8'), priorArtifact, 'superseded intermediate bytes replaced the prior last-good output');
     const pending = await stateAt(preview.url);
     assert.equal(pending.revision, 1, 'superseded intermediate bytes advanced the browser revision');
 
+    fs.writeFileSync(releaseB, 'release');
     const current = await waitForState(preview.url, (state) => state.status === 'verified' && state.generation === 3, 'current generation did not verify');
     assert.equal(current.revision, 2);
     assert.match(fs.readFileSync(output, 'utf8'), /Current B/);
