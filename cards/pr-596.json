@@ -1,0 +1,10 @@
+{
+  "templateVersion": 1,
+  "repository": "tt-a1i/archify",
+  "number": 596,
+  "author": "tt-a1i",
+  "title": "Promote tested dev batch to main",
+  "mergedAt": "2026-09-28T10:15:12Z",
+  "mergeCommit": "5313857da8bcb2c68ff2634ead64dd5343591ff1",
+  "url": "https://github.com/tt-a1i/archify/pull/596"
+}
