@@ -38,9 +38,9 @@ test('Motion Governor preserves mode, ownership, ambient completion and real cal
   files.static = path.join(scratch, 'static.html');
   execFileSync(process.execPath, [path.join(skillRoot, 'renderers/architecture/render-architecture.mjs'),
     path.join(skillRoot, 'examples', cases.architecture), files.static]);
-  const browser = new ChromeVisualBrowser(chrome);
+  let browser = new ChromeVisualBrowser(chrome);
   t.after(() => browser.close());
-  const session = await browser.sessionPromise;
+  let session = await browser.sessionPromise;
   await browser.cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' });
   const send = (method, params = {}) => browser.cdp.send(method, params, session);
   async function run(expression) {
@@ -60,10 +60,17 @@ test('Motion Governor preserves mode, ownership, ambient completion and real cal
     const expectedNavigation = ++navigationId;
     if (!preserveStorage) {
       fixtureUrl = pathToFileURL(files[mode]).href + `?theme=${theme}&testNavigation=${expectedNavigation}${query}`;
-      // Reset the disposable browser profile before navigation. Touching
-      // localStorage in a new-document script can disturb file-backed storage
-      // in Chrome; leave startup and reload reads to the Viewer itself.
-      await send('Storage.clearDataForStorageKey', { storageKey: 'file:///', storageTypes: 'local_storage' });
+      // file:// storage is keyed differently across Chrome platforms. Clearing
+      // the synthetic file:/// key can leave the actual file's saved intent.
+      // Fresh cases get a fresh profile; persistence cases still reload the
+      // same document in the same browser and let the Viewer read its storage.
+      if (expectedNavigation > 1) {
+        await browser.close();
+        browser = new ChromeVisualBrowser(chrome);
+        session = await browser.sessionPromise;
+        startup = undefined;
+        await browser.cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' });
+      }
     }
     if (startup) await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: startup });
     ({ identifier: startup } = await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
