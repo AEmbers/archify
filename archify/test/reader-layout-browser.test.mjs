@@ -181,7 +181,13 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
       const intrinsic = await snapshot('intrinsic-ratio-1.549');
       assert.equal(intrinsic.readerFit, 'intrinsic-height');
       assert.equal(intrinsic.receipt.ratio, 1.549);
-      assert.equal(intrinsic.active, true, 'intrinsic-height remains eligible below the wide-ratio threshold');
+      assert.equal(intrinsic.fixed, true);
+      assert.equal(intrinsic.active, false);
+      await viewport(1440, 599);
+      await stable();
+      const documentReader = await snapshot('intrinsic-short-viewport');
+      assert.equal(documentReader.fixed, false);
+      assert.equal(documentReader.active, true, 'intrinsic-height remains eligible below the wide-ratio threshold');
       assert.equal(intrinsic.wide, null);
       assert.equal(intrinsic.shape, null);
       for (const ratio of [1.549, 1.55, 1.551]) {

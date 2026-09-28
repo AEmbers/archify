@@ -653,9 +653,12 @@ resulting layout rather than importing Chrome's private state. Keeping this
 contract beside the source localizes navigation-clearance maintenance; the
 Reader/Chrome feedback and Camera/CSS dependencies still exist.
 
-Camera's viewport-docked navigation is outside the authored stage and therefore
+In the fixed-canvas shell's narrow/short viewport fallback, Camera's
+viewport-docked navigation is outside the authored stage and therefore
 is not eligible for a Chrome Layout reserve. Returning the navigation to its
-container restores the normal overlap measurement and rail behavior.
+container restores the normal overlap measurement and rail behavior. Older
+document shells without the diagram-notes hook retain Chrome Layout's reserved
+rail and lift; Camera must not take ownership of that dock.
 
 ## Camera contract
 

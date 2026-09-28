@@ -33,12 +33,11 @@ test('Semantic Lens preserves selection, legend preview and panel contracts', {
     execFileSync(process.execPath, [path.join(skillRoot, `renderers/${mode}/render-${mode}.mjs`),
       path.join(skillRoot, 'examples', example), files[mode]]);
   }
-  // A chapter-capable tall diagram exposes Lens clearing chapters through
-  // showAll: an accidental 100% reset clips the nodes that were just selected.
+  // A tall diagram exposes accidental camera resets during selection handoff.
   const tallInput = path.join(scratch, 'tall.json');
   fs.writeFileSync(tallInput, JSON.stringify({
     schema_version: 1, diagram_type: 'architecture',
-    meta: { title: 'Tall selection', output: 'tall.html', views: [{ id: 'both', label: 'Both roles', focus: ['store', 'guard'] }] },
+    meta: { title: 'Tall selection', output: 'tall.html' },
     components: [
       { id: 'store', type: 'database', label: 'Store', pos: [100, 700], size: [200, 80] },
       { id: 'guard', type: 'security', label: 'Guard', pos: [500, 500], size: [200, 80] },
@@ -142,7 +141,7 @@ test('Semantic Lens preserves selection, legend preview and panel contracts', {
     await run(`new Promise(resolve=>{addEventListener('hashchange',()=>resolve(),{once:true});location.hash=${JSON.stringify(value)};})`);
   }
 
-  await t.test('legend selection preserves fitted and manual cameras while clearing chapters', async () => {
+  await t.test('legend selection preserves fitted and manual cameras while clearing node focus', async () => {
     for (const [width, height] of [[1850, 760], [1024, 600]]) {
       await load('tall');
       await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
@@ -170,10 +169,10 @@ test('Semantic Lens preserves selection, legend preview and panel contracts', {
       await snapshot(`tall-selection-${width}`);
     }
     await load('tall');
-    await run(`Archify.guidedViews.activate('both')`);
-    await run(`lensWait(()=>!Archify.guidedViews.handoff())`);
+    await run(`Archify.focus.setMany(['store', 'guard'])`);
+    assert.deepEqual(await run('Archify.focus.active()'), ['store', 'guard']);
     await run(`Archify.semanticLens.select('database')`);
-    assert.deepEqual(await run('Archify.guidedViews.focus()'), [], 'Lens still clears chapter ownership');
+    assert.equal(await run('Archify.focus.active()'), null, 'Lens clears node focus ownership');
   });
 
   await t.test('five modes and optional legend initialization preserve counts, roles and embed boundaries', async () => {

@@ -1,3 +1,4 @@
+import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ChromeVisualBrowser, findChrome } from '../bin/visual-check.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-test('automatic architectures preserve primary reading size when fitting the full page would shrink text', async (t) => {
+test('document-shell automatic architectures preserve primary reading size when fitting the full page would shrink text', async (t) => {
   if (!Object.hasOwn(process.env, 'ARCHIFY_CHROME')) return t.skip('Set ARCHIFY_CHROME for real browser checks');
   const chrome = findChrome();
   assert.ok(chrome);
@@ -20,6 +21,7 @@ test('automatic architectures preserve primary reading size when fitting the ful
   const output = path.join(dir, 'output.html');
   fs.writeFileSync(input, JSON.stringify(spec));
   execFileSync(process.execPath, [path.join(root, 'bin/archify.mjs'), 'render', 'architecture', input, output]);
+  useDocumentReader(output);
   const browser = new ChromeVisualBrowser(chrome);
   try {
     const session = await browser.sessionPromise;
@@ -120,7 +122,7 @@ test('a narrow tall architecture fits the first screen without enlarging the oth
   }
 });
 
-test('a first-screen fit never pushes relationship labels below the 6px floor', async (t) => {
+test('a document-shell first-screen fit never pushes relationship labels below the 6px floor', async (t) => {
   if (!Object.hasOwn(process.env, 'ARCHIFY_CHROME')) return t.skip('Set ARCHIFY_CHROME for real browser checks');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-edge-floor-'));
   const input = path.join(dir, 'input.json');
@@ -140,6 +142,7 @@ test('a first-screen fit never pushes relationship labels below the 6px floor', 
   execFileSync(process.execPath, [path.join(root, 'bin/archify.mjs'), 'render', 'architecture', input, output]);
   const browser = new ChromeVisualBrowser(findChrome());
   try {
+    useDocumentReader(output);
     await browser.inspect({ artifactPath: output, width: 1440, height: 900, theme: 'light' });
     const session = await browser.sessionPromise;
     const result = await browser.cdp.send('Runtime.evaluate', { returnByValue: true, expression: `(() => {

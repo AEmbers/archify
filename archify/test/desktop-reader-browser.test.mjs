@@ -1,3 +1,4 @@
+import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -66,7 +67,14 @@ test('default sequence and dataflow canvases fit the real desktop reader without
         if (authored) candidate.meta.viewBox = viewBox;
         fs.writeFileSync(input, JSON.stringify(candidate));
         execFileSync(process.execPath, [path.join(skillRoot, 'bin/archify.mjs'), 'render', type, input, artifact]);
-        const result = await runVisualCheck({ artifactPath: artifact, chromePath });
+        const canvas = await runVisualCheck({ artifactPath: artifact, chromePath });
+        assert.equal(canvas.exitCode, 0, `${type}: fixed canvas ${JSON.stringify(canvas.receipt.diagnostics)}`);
+        assert.ok(canvas.receipt.containment.viewports.every(v => v.ok && !v.verticalScrollAccepted));
+        if (authored) assert.ok(fs.readFileSync(artifact, 'utf8').includes(`viewBox="0 0 ${viewBox.join(' ')}"`));
+        const documentArtifact = path.join(tmp, `${type}-${authored}-document.html`);
+        fs.copyFileSync(artifact, documentArtifact);
+        useDocumentReader(documentArtifact);
+        const result = await runVisualCheck({ artifactPath: documentArtifact, chromePath });
         if (authored) {
           assert.equal(result.exitCode, 1, `${type}: explicit narrow canvas still requires repair`);
           assert.ok(result.receipt.diagnostics.some(({ code }) => code === 'viewer/viewport-overflow'));
@@ -180,6 +188,7 @@ test('production showcase is readable in the real 1440 by 900 adaptive reader', 
       'showcase',
     ], { cwd: skillRoot, encoding: 'utf8' });
 
+    useDocumentReader(artifact);
     const artifactSource = fs.readFileSync(artifact, 'utf8');
     const svgRoot = artifactSource.match(/<svg\b[^>]*>/)?.[0];
     assert.ok(svgRoot, 'production fixture must contain an SVG root');
@@ -247,6 +256,7 @@ test('route-expanded intrinsic architecture preserves reading size with ordinary
       '--json',
     ], { cwd: skillRoot, encoding: 'utf8' });
 
+    useDocumentReader(artifact);
     const html = fs.readFileSync(artifact, 'utf8');
     const svgRoot = html.match(/<svg\b[^>]*>/)?.[0];
     assert.ok(svgRoot, 'expected an SVG root');
@@ -305,6 +315,7 @@ test('extreme intrinsic architecture keeps readable page scroll below first-scre
       '--json',
     ], { cwd: skillRoot, encoding: 'utf8' });
 
+    useDocumentReader(artifact);
     const html = fs.readFileSync(artifact, 'utf8');
     const svgRoot = html.match(/<svg\b[^>]*>/)?.[0];
     assert.ok(svgRoot, 'expected an SVG root');
@@ -504,6 +515,7 @@ test('authored Architecture canvas keeps its scale and accepts readable document
   };
   fs.writeFileSync(input, JSON.stringify(doc));
   execFileSync(process.execPath, [path.join(skillRoot, 'bin/archify.mjs'), 'render', 'architecture', input, artifact]);
+  useDocumentReader(artifact);
   const html = fs.readFileSync(artifact, 'utf8');
   assert.match(html, /viewBox="0 0 1040 700"/);
   assert.match(html, /<rect x="300" y="470" width="140" height="64"/);

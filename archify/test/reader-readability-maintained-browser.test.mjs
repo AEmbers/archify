@@ -1,3 +1,4 @@
+import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,7 +18,7 @@ if (chromeConfigured && !chromePath) {
 // queue/worker gap 105px. Readability must not rely on detached label masks.
 const fixtureJson = path.join(root, 'test/fixtures/reader-readability/synthetic-wide.architecture.json');
 
-test('declared wide synthetic reader preserves geometry and reaches edge/node readability', {
+test('document-shell declared wide synthetic reader preserves geometry and reaches edge/node readability', {
   skip: chromePath ? false :
     'Set ARCHIFY_CHROME to run the maintained real browser regression.',
 }, async () => {
@@ -28,6 +29,7 @@ test('declared wide synthetic reader preserves geometry and reaches edge/node re
       path.join(root, 'bin', 'archify.mjs'), 'deliver', 'architecture', fixtureJson, artifact,
       '--quality', 'showcase',
     ], { cwd: root, stdio: 'pipe' });
+    useDocumentReader(artifact);
     const artifactSource = fs.readFileSync(artifact, 'utf8');
     const svgStart = artifactSource.indexOf('<svg');
     const svgEnd = artifactSource.indexOf('</svg>', svgStart) + '</svg>'.length;
@@ -139,7 +141,7 @@ test('declared wide synthetic reader preserves geometry and reaches edge/node re
           assert.equal(state.theme, theme, JSON.stringify(state));
           assert.equal(state.motionMode, 'still', JSON.stringify(state));
           if (state.motion !== null) assert.equal(state.motion, 'still', JSON.stringify(state));
-          assert.equal(state.detailLevel, 'read', JSON.stringify(state));
+          assert.equal(state.detailLevel, 'full', JSON.stringify(state));
           assert.equal(state.cameraScale, 1, JSON.stringify(state));
           assert.equal(state.viewPercent, '100%', JSON.stringify(state));
           assert.ok(Number.isFinite(state.chromeStageIntersectionArea));

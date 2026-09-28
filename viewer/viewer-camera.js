@@ -838,7 +838,9 @@
         var margin = window.innerWidth <= 720 ? 8 : 16;
         var viewportEdge = window.innerHeight - margin;
         var wasDocked = navigation.hasAttribute('data-viewport-docked');
-        var docked = !document.documentElement.hasAttribute('data-fixed-canvas') && !mobileScrollMode() && rect.top < viewportEdge &&
+        // Older document shells retain Chrome Layout's reserved rail and lift.
+        // The fixed-canvas shell uses this viewport dock only in its fallback.
+        var docked = Boolean(document.getElementById('diagram-notes')) && !document.documentElement.hasAttribute('data-fixed-canvas') && !mobileScrollMode() && rect.top < viewportEdge &&
           (rect.bottom > viewportEdge || (wasDocked && rect.bottom > 0));
         var changed = wasDocked !== docked;
         navigation.toggleAttribute('data-viewport-docked', docked);

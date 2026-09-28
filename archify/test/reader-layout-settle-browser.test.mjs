@@ -1,3 +1,4 @@
+import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -20,7 +21,7 @@ if (chromeConfigured && !chromePath) {
 // cards, settle() narrowed it from the resulting overflow, and the two never
 // met: whenStable() timed out and visual-check reported a runtime failure
 // instead of a layout verdict.
-test('Reader Layout settles when card height depends on the reader width', {
+test('document-shell Reader Layout settles when card height depends on the reader width', {
   skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
 }, async () => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-reader-settle-'));
@@ -30,6 +31,7 @@ test('Reader Layout settles when card height depends on the reader width', {
     path.join(skillRoot, 'test/fixtures/architecture-viewport/portrait-cards.architecture.json'),
     output,
   ]);
+  useDocumentReader(output);
   const browser = new ChromeVisualBrowser(chromePath);
   try {
     const session = await browser.sessionPromise;

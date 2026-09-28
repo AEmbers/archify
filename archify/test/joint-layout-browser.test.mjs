@@ -1,3 +1,4 @@
+import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -138,7 +139,7 @@ const observerCounters = `(() => {
   };
 })()`;
 
-test('one joint wait preserves real Reader/Chrome convergence at the CLI boundary', {
+test('one joint wait in a document shell preserves real Reader/Chrome convergence at the CLI boundary', {
   skip: chrome ? false : 'Set ARCHIFY_CHROME to run the real joint-layout browser regression.',
 }, async (t) => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-joint-layout-'));
@@ -152,6 +153,7 @@ test('one joint wait preserves real Reader/Chrome convergence at the CLI boundar
       execFileSync(process.execPath, [path.join(skillRoot, 'bin/archify.mjs'),
         'render', 'architecture', path.resolve(skillRoot, input), file,
         ...(repoRoot ? ['--repo-root', repoRoot] : [])], { stdio: 'pipe' });
+      useDocumentReader(file);
       return file;
     }
     // Use the existing evidence-browser fixture pattern so preservation covers
@@ -174,9 +176,9 @@ test('one joint wait preserves real Reader/Chrome convergence at the CLI boundar
     const pristine = new Map([wide, intrinsic].map(file => [file, fs.readFileSync(file, 'utf8')]));
     function variant(name, base, { before = '', after = '' } = {}) {
       let html = pristine.get(base);
-      const anchor = '  <script>\n    var Archify = {};';
-      assert.ok(html.includes(anchor), 'Viewer fixture anchor');
-      if (before) html = html.replace(anchor, () => `  <script>${before}</script>\n${anchor}`);
+      const anchor = /<script>\s*var Archify\s*=\s*\{\s*\};/g;
+      assert.equal([...html.matchAll(anchor)].length, 1, 'one compact Viewer fixture anchor');
+      if (before) html = html.replace(anchor, match => `<script>${before}</script>\n${match}`);
       if (after) html = html.replace('</body>', () => `<script>${after}</script>\n</body>`);
       const file = path.join(scratch, `${name}.html`);
       fs.writeFileSync(file, html);
