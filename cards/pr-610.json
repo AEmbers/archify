@@ -1,0 +1,10 @@
+{
+  "templateVersion": 1,
+  "repository": "tt-a1i/archify",
+  "number": 610,
+  "author": "tt-a1i",
+  "title": "Promote update reminders to stable",
+  "mergedAt": "2026-09-28T14:56:42Z",
+  "mergeCommit": "445bb35550f115c740acb5900217fcca13acc79e",
+  "url": "https://github.com/tt-a1i/archify/pull/610"
+}
