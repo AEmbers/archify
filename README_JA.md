@@ -29,7 +29,7 @@
   <a href="https://github.com/tt-a1i/archify/stargazers"><img src="https://img.shields.io/github/stars/tt-a1i/archify?style=flat-square&amp;color=E5B650&amp;logo=github&amp;label=Stars" alt="GitHub stars" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT License" /></a>
   <a href="archify/SKILL.md"><img src="https://img.shields.io/badge/Agent-Skill-7C3AED?style=flat-square" alt="Agent Skill" /></a>
-  <a href="CHANGELOG.md#unreleased"><img src="https://img.shields.io/badge/version-2.17.0--dev.1-0891b2?style=flat-square" alt="Development version 2.17.0-dev.1" /></a>
+  <a href="CHANGELOG.md#300--2026-09-28"><img src="https://img.shields.io/badge/version-3.0.0-0891b2?style=flat-square" alt="Stable version 3.0.0" /></a>
 </p>
 
 <p align="center">
@@ -151,8 +151,6 @@ Export メニューから PNG をクリップボードにコピーしたり、�
 
 ![Export メニュー](docs/assets/archify-menu.png)
 
-README やリリースノート、SNS 投稿向けに正規の 1200×630 画像が欲しいときは **Copy Share Card** を使ってください。
-
 ルートをトレースしたあと、**Export → Route Share Card** を選ぶと、その記述済みパスを 1200×630 の PNG としてダウンロードできます。図全体も文脈として保持されます。
 
 ![Users から API Server への正確な経路を、アーキテクチャ全体を文脈として保持したまま示す Route Share Card](docs/assets/archify-route-share-card.png)
@@ -167,7 +165,7 @@ README やリリースノート、SNS 投稿向けに正規の 1200×630 画像�
 
 ## クイックスタート
 
-**現在の開発版:** `v2.17.0-dev.1`。[変更履歴](CHANGELOG.md#unreleased)を参照してください。
+**現在の安定版:** `v3.0.0`。[変更履歴](CHANGELOG.md#300--2026-09-28)を参照してください。
 
 ### 1. インストール
 
@@ -194,7 +192,7 @@ npx skills use tt-a1i/archify@archify --agent codex
 
 [エージェント切り替え](https://tt-a1i.github.io/archify/start.html?agent=cursor&type=architecture)は `cursor`、`codex`、`claude-code`、`opencode` に対応しています。
 
-Archify は固定の安定版マニフェストを GET して任意の更新リマインダーを表示することがありますが、更新をダウンロードしたりインストールしたりすることはありません。チェックに成功すると次回まで約 72 時間（±20%）待機し、失敗した場合はアクティブに使用していれば 6 時間後、その後は 24 時間後に再試行します。サーバーが受け取るのは通常の HTTP メタデータ（IP と時刻）だけで、バージョン、Agent、プロジェクトデータ、プロンプト、アカウント／デバイス ID、ETag は送信されません。更新するかどうか、いつ更新するかは常にあなたが決めます。`ARCHIFY_UPDATE_CHECK_DISABLED=1` を設定すると、ネットワーク通信とリマインダー状態の書き込みを無効化できます。
+Archify は固定の安定版マニフェストを GET して任意の更新リマインダーを表示することがありますが、更新をダウンロードしたりインストールしたりすることはありません。チェックに成功すると次回まで約 24 時間（±20%）待機し、失敗した場合はアクティブに使用していれば 6 時間後、その後は 24 時間後に再試行します。サーバーが受け取るのは通常の HTTP メタデータ（IP と時刻）だけで、バージョン、Agent、プロジェクトデータ、プロンプト、アカウント／デバイス ID、ETag は送信されません。更新するかどうか、いつ更新するかは常にあなたが決めます。`ARCHIFY_UPDATE_CHECK_DISABLED=1` を設定すると、ネットワーク通信とリマインダー状態の書き込みを無効化できます。
 
 </details>
 

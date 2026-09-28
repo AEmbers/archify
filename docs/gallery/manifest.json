@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generator": "scripts/build-gallery.mjs",
-  "archifyVersion": "2.17.0-dev.1",
+  "archifyVersion": "3.0.0",
   "entryCount": 11,
   "checkCount": 99,
   "entries": [
@@ -19,8 +19,8 @@
       "engineeringProfile": null,
       "nodeCount": 12,
       "edgeCount": 11,
-      "artifactBytes": 642941,
-      "artifactSha256": "5a193d2e1b54d5b33df682415697dc47f05d0eb80250b2a902caea712b7fa2ff",
+      "artifactBytes": 641663,
+      "artifactSha256": "e367fdd4cbc516d4017852f607c5eabd86f761d563782ee1203d62217b4dd307",
       "sourceBytes": 4939,
       "sourceSha256": "d67965d50872c97e4ff3476271e645bf19fab6b3ab44e111bdb44b063e3aa36f",
       "checks": [
@@ -154,8 +154,8 @@
       "engineeringProfile": "deployment-ownership",
       "nodeCount": 12,
       "edgeCount": 12,
-      "artifactBytes": 645668,
-      "artifactSha256": "43110fcc521925a9fcf927129ddbc86c54ec7fcb9f41ec1b1ffd4a642f362148",
+      "artifactBytes": 644390,
+      "artifactSha256": "0479ebabf46cab8644db2e09811c823b891181db036b7eba155acee13b0412f2",
       "sourceBytes": 4734,
       "sourceSha256": "cb54bad2dfd0c2d02aa5b496bde6839789a0f07f23062343c4458b8d38806c13",
       "checks": [
@@ -287,10 +287,10 @@
       "engineeringProfile": null,
       "nodeCount": 7,
       "edgeCount": 12,
-      "artifactBytes": 637435,
-      "artifactSha256": "d0141980201b47c2a382724aa06e0b39bd91ab7cb129770870696f42358a66cb",
+      "artifactBytes": 636203,
+      "artifactSha256": "e06f70f9bbf7ebee9736e6ee408b9f82089b79aa827b2bafb6987ad3982a25c4",
       "sourceBytes": 3805,
-      "sourceSha256": "f5c2e44f9a44000adc7c3b3040c4fcd88fe50b7cf8761302c21eb0c184e5780a",
+      "sourceSha256": "f8486daa803fff6c295cecca4604c561fbbf9acb2e83326022b5a87639e8afe6",
       "checks": [
         {
           "name": "single_svg",
@@ -374,6 +374,18 @@
           "measured": false,
           "reviewSuggested": false
         },
+        "sequenceColumnSpace": {
+          "measured": true,
+          "columnFit": "spread",
+          "participantCount": 7,
+          "occupiedRight": 1040,
+          "viewBoxLeft": 0,
+          "canvasWidth": 1080,
+          "emptyRightPx": 40,
+          "emptyRightRatio": 0.037,
+          "typicalParticipantWidth": 113,
+          "reviewSuggested": false
+        },
         "desktopReadability": {
           "budgetBasis": "legacy-930",
           "readerContract": "declared-wide-v1",
@@ -409,8 +421,8 @@
       "engineeringProfile": null,
       "nodeCount": 10,
       "edgeCount": 10,
-      "artifactBytes": 638455,
-      "artifactSha256": "54bf510a365489cb1bdd965a0aa5c41c147619bf713aeadda9ba6b791a7f7914",
+      "artifactBytes": 637177,
+      "artifactSha256": "ca2dc989fe9215912d33ad303095a41c11ffb0947187796a46463e03b84acc9a",
       "sourceBytes": 4510,
       "sourceSha256": "dbd5c174af66296caec372e7214cf4df7158b50a563508e16826b95ab8d1cd6c",
       "checks": [
@@ -549,8 +561,8 @@
       "engineeringProfile": null,
       "nodeCount": 11,
       "edgeCount": 10,
-      "artifactBytes": 635775,
-      "artifactSha256": "7754a4322b0ca585a4d6d9bc66177a04f1669563887b561712629342b78f088e",
+      "artifactBytes": 634497,
+      "artifactSha256": "3cdeb4b7e87a3fe599ca0c183108977ef95e307fcc4ae1aff2f8385b4f782e0f",
       "sourceBytes": 4723,
       "sourceSha256": "630be98449925d2716ecb8439f404b2bff5fe65ba905b0ad0baea6d96890c526",
       "checks": [
@@ -735,8 +747,8 @@
       "engineeringProfile": null,
       "nodeCount": 10,
       "edgeCount": 10,
-      "artifactBytes": 639775,
-      "artifactSha256": "fb5b25fe28cade894f08291d8275b75d6c854f514d234d10289043cd864d8c43",
+      "artifactBytes": 638497,
+      "artifactSha256": "95aadd3896efa1b0a3297ae0f280ef5d550c815141c42301a3dc6ff55b4d2758",
       "sourceBytes": 5035,
       "sourceSha256": "8a635db9e51a5b1a8d2955b9d66f5b9a450e0a298432ce8f2e2f0be11f372e05",
       "checks": [
@@ -870,8 +882,8 @@
       "engineeringProfile": null,
       "nodeCount": 7,
       "edgeCount": 14,
-      "artifactBytes": 636516,
-      "artifactSha256": "b54eaba10d73daa35de875b82e96faba14d9bd47dacae4747cb6d6edc8c988ae",
+      "artifactBytes": 635289,
+      "artifactSha256": "249c46f09e412cece9db2840dab9b678e15b93a86eb8cab36a52700c8463b9fd",
       "sourceBytes": 3766,
       "sourceSha256": "b8c6c52f1763ede2933c77deb8da59b3e06917bc41d27e66df896136456b859a",
       "checks": [
@@ -957,6 +969,18 @@
           "measured": false,
           "reviewSuggested": false
         },
+        "sequenceColumnSpace": {
+          "measured": true,
+          "columnFit": "fixed",
+          "participantCount": 7,
+          "occupiedRight": 753,
+          "viewBoxLeft": 0,
+          "canvasWidth": 820,
+          "emptyRightPx": 67,
+          "emptyRightRatio": 0.082,
+          "typicalParticipantWidth": 86,
+          "reviewSuggested": false
+        },
         "desktopReadability": {
           "budgetBasis": "legacy-930",
           "readerContract": "declared-wide-v1",
@@ -1010,8 +1034,8 @@
       "engineeringProfile": null,
       "nodeCount": 12,
       "edgeCount": 12,
-      "artifactBytes": 643695,
-      "artifactSha256": "cf827f8630525698c0fefc9c27e0e08d27ef63e607eef8bdb34618a067b3da28",
+      "artifactBytes": 642417,
+      "artifactSha256": "78284d425b8b65fba39e97cbcb9dd898a220559ec66d55cfabf0c94a1ee03c28",
       "sourceBytes": 4769,
       "sourceSha256": "3bdd77674282009c7c68d588cf8a3c495bc98a3be1b9c45327fd1801a6f83a23",
       "checks": [
@@ -1162,8 +1186,8 @@
       "engineeringProfile": null,
       "nodeCount": 10,
       "edgeCount": 6,
-      "artifactBytes": 632833,
-      "artifactSha256": "87a55ab6a363b10afa90716aeeb3c34e1e754be7298010b069b4579cd5a3d9eb",
+      "artifactBytes": 632807,
+      "artifactSha256": "0324f8b9946fee68d034794847ab069b2c86c112a33eb6e881634307f17bf5e0",
       "sourceBytes": 3405,
       "sourceSha256": "230242a7557663877766c43a9fe7cffe8b4fb66e4866457dccd24c63175b4917",
       "checks": [
@@ -1327,16 +1351,16 @@
       "input": "gallery/sources/deployment-release.lifecycle.json",
       "artifact": "gallery/artifacts/deployment-release.lifecycle.html",
       "focus": "live",
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "visualPreset": "signal-flow",
       "animation": "trace",
       "engineeringProfile": null,
       "nodeCount": 11,
-      "edgeCount": 6,
-      "artifactBytes": 634335,
-      "artifactSha256": "3ad1ab24f436687536d15a37f9a63b389c105c4812b9c81c579c5e97ef9735d0",
-      "sourceBytes": 3629,
-      "sourceSha256": "ebcd29cbb7001f9a07e5fb45945777f7fa3832bc391ca591bda9ffe3d4be131e",
+      "edgeCount": 11,
+      "artifactBytes": 639862,
+      "artifactSha256": "c2f06267730004deadbbea6d2a7e17f9d80f0038e7e849e964af243ddd916199",
+      "sourceBytes": 3507,
+      "sourceSha256": "f565a8acfebdb21453e2bccd82d3760b4736e38fe194fb2f0804b57817eba813",
       "checks": [
         {
           "name": "single_svg",
@@ -1381,7 +1405,7 @@
         "status": "pass",
         "summary": {
           "errors": 0,
-          "warnings": 1
+          "warnings": 0
         },
         "metrics": {
           "properCrossings": 0,
@@ -1391,16 +1415,16 @@
           "containerBorderRuns": 0,
           "labelRouteClearanceIssues": 0,
           "labelCanvasOverflowIssues": 0,
-          "minLabelRouteClearance": null,
+          "minLabelRouteClearance": 21,
           "desktopReadabilityIssues": 0,
-          "viewportHeightIssues": 1,
-          "minProjectedNodeTextPx": 6.642857142857143,
-          "maxBends": 0,
+          "viewportHeightIssues": 0,
+          "minProjectedNodeTextPx": 6.91449814126394,
+          "maxBends": 2,
           "routesOverSuggestedBends": 0,
           "maxStretch": 1,
           "routesOverSuggestedStretch": 0,
-          "minSegmentPx": 90,
-          "minInteriorSegmentPx": null,
+          "minSegmentPx": 60,
+          "minInteriorSegmentPx": 174,
           "shortSegmentCount": 0,
           "shortEndpointSegmentCount": 0,
           "shortInteriorSegmentCount": 0,
@@ -1434,29 +1458,11 @@
             "kind": "node",
             "id": "queued"
           },
-          "minimumSourceTextPx": 7,
-          "minimumProjectedTextPx": 6.642857142857143,
-          "semanticTextCount": 22
+          "minimumSourceTextPx": 8,
+          "minimumProjectedTextPx": 6.91449814126394,
+          "semanticTextCount": 24
         },
-        "issues": [
-          {
-            "severity": "warning",
-            "code": "composition/viewport-height",
-            "readerFit": null,
-            "viewBoxWidth": 980,
-            "viewBoxHeight": 680,
-            "viewportWidth": 1440,
-            "viewportHeight": 900,
-            "ratio": 1.44,
-            "wideRatio": 1.55,
-            "svgWidthPx": 1346,
-            "svgHeightPx": 934,
-            "fixedChromePx": 126,
-            "pageHeightPx": 1060,
-            "overflowPx": 160,
-            "detail": "[composition/viewport-height] Preserve every node, relationship, and label. This 980x680 canvas (ratio 1.44) declares no intrinsic-height fit and is below the 1.55 wide ratio, so the desktop Reader can neither narrow it nor accept vertical scroll: it renders 934px tall at the full 1346px width and the page reaches 1060px before cards against 900px, a certain visual-check failure. Either compact vertical spacing so meta.viewBox height is at most 632 at this width, or spread content sideways so the width is at least 1054 at this height; for architecture, omitting meta.viewBox lets the renderer size the canvas and declare the fit."
-          }
-        ]
+        "issues": []
       }
     },
     {
@@ -1473,8 +1479,8 @@
       "engineeringProfile": null,
       "nodeCount": 10,
       "edgeCount": 9,
-      "artifactBytes": 637481,
-      "artifactSha256": "d8d4c978954911bf66bdb203e7d8fd9aea3e349e87be5249e78aa99be33c1a44",
+      "artifactBytes": 636203,
+      "artifactSha256": "b5ccf510068e49d2e5bfda7931057c9476df69899a93694412f530d2fc5d1f26",
       "sourceBytes": 3197,
       "sourceSha256": "95e051b27a9e4a3307e194c0f666fca4af51470be7e2228d400ff48aea5b353b",
       "checks": [

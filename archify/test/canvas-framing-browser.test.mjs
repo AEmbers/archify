@@ -264,7 +264,11 @@ test('semantic focus framing contains every target with desktop notes open or cl
     for (const notes of [false, true]) {
       if (notes) { await run("document.getElementById('btn-diagram-notes').click()"); await stable(); }
       for (const chapter of [{ id: 'all-nodes', focus: spec.components.map(node => node.id) }]) {
+        const beforeSelection = await run('Archify.view.state()');
         await run(`Archify.focus.setMany(${JSON.stringify(chapter.focus)}, { toggle: false })`);
+        await stable();
+        assert.deepEqual(await run('Archify.view.state()'), beforeSelection, 'selection preserves the camera');
+        await run(`Archify.view.reveal(${JSON.stringify(chapter.focus)})`);
         await stable();
         const observed = await run(`(()=>{
           const stage=Archify.viewerChromeLayout.stageRect();

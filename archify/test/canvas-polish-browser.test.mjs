@@ -22,7 +22,7 @@ const observation = `(()=>{
     dock:d?r(d):null,container:r(c),nav:r(n),font:d?getComputedStyle(d).fontSize:null,
     collapsed:d?.hasAttribute('data-collapsed'),listHidden:d?.querySelector('.fixed-legend-list').hidden,
     source:source?entries(source):[],entries:d?entries(d):[],state:Archify.view.state(),
-    buttons:[...n.querySelectorAll('button')].map(b=>({...r(b),font:parseFloat(getComputedStyle(b).fontSize)})),
+    buttons:[...n.querySelectorAll('button')].filter(visible).map(b=>({...r(b),font:parseFloat(getComputedStyle(b).fontSize)})),
     grid:parseFloat(c.style.getPropertyValue('--archify-grid-minor')),gridOrigin:[c.style.getPropertyValue('--archify-grid-x'),c.style.getPropertyValue('--archify-grid-y')],
     range:[document.scrollingElement.scrollWidth-innerWidth,document.scrollingElement.scrollHeight-innerHeight],
     preset:document.documentElement.dataset.preset,theme:document.documentElement.dataset.theme,
@@ -51,6 +51,7 @@ test('Canvas polish preserves authored legends, docking, input, mode fallback an
   }
   for(const locale of ['en','zh-CN','es']) {
     const doc=structuredClone(input);doc.meta.locale=locale;
+    if(locale==='es')doc.meta.translations=JSON.parse(fs.readFileSync(path.join(root,'examples/locales/es.json'),'utf8'));
     const source=path.join(scratch,locale+'.json');fs.writeFileSync(source,JSON.stringify(doc));render(locale,'architecture',source);
   }
   // Match the existing legacy bridge zero-count fixture: an old artifact can

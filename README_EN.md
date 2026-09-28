@@ -29,7 +29,7 @@
   <a href="https://github.com/tt-a1i/archify/stargazers"><img src="https://img.shields.io/github/stars/tt-a1i/archify?style=flat-square&amp;color=E5B650&amp;logo=github&amp;label=Stars" alt="GitHub stars" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT License" /></a>
   <a href="archify/SKILL.md"><img src="https://img.shields.io/badge/Agent-Skill-7C3AED?style=flat-square" alt="Agent Skill" /></a>
-  <a href="CHANGELOG.md#unreleased"><img src="https://img.shields.io/badge/version-2.17.0--dev.1-0891b2?style=flat-square" alt="Development version 2.17.0-dev.1" /></a>
+  <a href="CHANGELOG.md#300--2026-09-28"><img src="https://img.shields.io/badge/version-3.0.0-0891b2?style=flat-square" alt="Stable version 3.0.0" /></a>
 </p>
 
 <p align="center">
@@ -39,6 +39,8 @@
   <a href="#community"><img src="https://img.shields.io/badge/QQ-1688D8?style=for-the-badge&amp;logo=qq&amp;logoColor=white" alt="Archify QQ group" /></a>
   <a href="https://x.com/t20000622yy"><img src="https://img.shields.io/badge/Creator_on_X-181717?style=for-the-badge&amp;logo=x&amp;logoColor=white" alt="Follow the creator on X" /></a>
 </p>
+
+<p align="center"><a href="#sponsors"><strong>❤️ Partners & sponsors: Kimi Work · Supercode · EverMind/Raven</strong></a></p>
 
 ## See Archify in action
 
@@ -73,7 +75,15 @@ Then continue: “Add authentication”, “Highlight the cache-miss path”, or
 
 [Choose your agent](https://tt-a1i.github.io/archify/start.html?agent=cursor&type=architecture) · [Installation details and update checks](#quick-start)
 
+<a id="sponsors"></a>
+
 ## ❤️ Sponsors
+
+<p align="center">
+  <a href="https://www.kimi.ai/?aff=archify"><img src="docs/assets/sponsors/archify-kimi-work.png" alt="Archify × Kimi Work collaboration banner" width="800" /></a>
+</p>
+
+**Archify × Kimi Work.** Find Archify in the Kimi Work plugin store as **Interactive Architecture Diagram**. Describe your system in one sentence to create an interactive diagram. **[Try it in Kimi Work →](https://www.kimi.ai/?aff=archify)**
 
 <table>
 <tr>
@@ -151,8 +161,6 @@ The Export menu copies PNG to the clipboard and downloads static or motion forma
 
 ![Export menu](docs/assets/archify-menu.png)
 
-Use **Copy Share Card** when you want a canonical 1200×630 image for a README, release, or social post.
-
 After tracing a route, **Export → Route Share Card** downloads that authored path as a 1200×630 PNG with the full diagram retained for context.
 
 ![Route Share Card showing the exact Users to API Server path with the full architecture retained as context](docs/assets/archify-route-share-card.png)
@@ -167,7 +175,7 @@ Open [`examples/web-app.html`](examples/web-app.html) locally to try the complet
 
 ## Quick start
 
-**Current development version:** `v2.17.0-dev.1`. See [Changelog](CHANGELOG.md#unreleased).
+**Current stable version:** `v3.0.0`. See [Changelog](CHANGELOG.md#300--2026-09-28).
 
 ### 1. Install
 
@@ -194,7 +202,7 @@ npx skills use tt-a1i/archify@archify --agent codex
 
 The [agent switcher](https://tt-a1i.github.io/archify/start.html?agent=cursor&type=architecture) covers `cursor`, `codex`, `claude-code`, and `opencode`.
 
-Archify may GET the fixed stable manifest solely to show an optional reminder; it never downloads or installs updates. Successful checks wait about 72 hours (±20%); active use retries failures after 6, then 24 hours. The server sees normal HTTP metadata (IP and time), but receives no version, Agent, project data, prompts, account/device ID, or ETag. You decide whether and when to update. Set `ARCHIFY_UPDATE_CHECK_DISABLED=1` to disable networking and reminder-state writes.
+Archify may GET the fixed stable manifest solely to show an optional reminder; it never downloads or installs updates. Successful checks wait about 24 hours (±20%); active use retries failures after 6, then 24 hours. The server sees normal HTTP metadata (IP and time), but receives no version, Agent, project data, prompts, account/device ID, or ETag. You decide whether and when to update. Set `ARCHIFY_UPDATE_CHECK_DISABLED=1` to disable networking and reminder-state writes.
 
 </details>
 
@@ -333,7 +341,7 @@ Settings:
 }
 ```
 
-`meta.locale=en|zh-CN` localizes page title, Legend, states/errors, a11y, HTML/SVG `lang`—never authored content. Otherwise omit; preserve requested-language copy; disclose English fallback. Static omits `animation`; `classic` defaults.
+`meta.locale` localizes page title, Legend, states/errors, a11y, HTML/SVG `lang`—never authored content. `en`/`zh-CN` are built in; other languages, including Spanish (`es`), need `meta.translations` (canonical message key → translated string; see `examples/locales/es.json`), or the renderer falls back to English and discloses it. Static omits `animation`; `classic` defaults.
 
 </details>
 

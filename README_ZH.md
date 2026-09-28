@@ -29,7 +29,7 @@
   <a href="https://github.com/tt-a1i/archify/stargazers"><img src="https://img.shields.io/github/stars/tt-a1i/archify?style=flat-square&amp;color=E5B650&amp;logo=github&amp;label=Stars" alt="GitHub stars" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT License" /></a>
   <a href="archify/SKILL.md"><img src="https://img.shields.io/badge/Agent-Skill-7C3AED?style=flat-square" alt="Agent Skill" /></a>
-  <a href="CHANGELOG.md#unreleased"><img src="https://img.shields.io/badge/version-2.17.0--dev.1-0891b2?style=flat-square" alt="Development version 2.17.0-dev.1" /></a>
+  <a href="CHANGELOG.md#300--2026-09-28"><img src="https://img.shields.io/badge/version-3.0.0-0891b2?style=flat-square" alt="Stable version 3.0.0" /></a>
 </p>
 
 <p align="center">
@@ -39,6 +39,8 @@
   <a href="#社区交流"><img src="https://img.shields.io/badge/QQ-1688D8?style=for-the-badge&amp;logo=qq&amp;logoColor=white" alt="Archify QQ group" /></a>
   <a href="https://x.com/t20000622yy"><img src="https://img.shields.io/badge/Creator_on_X-181717?style=for-the-badge&amp;logo=x&amp;logoColor=white" alt="Follow the creator on X" /></a>
 </p>
+
+<p align="center"><a href="#sponsors"><strong>❤️ 合作与赞助伙伴：Kimi Work · Supercode · EverMind/Raven</strong></a></p>
 
 ## 看看 Archify 能做什么
 
@@ -73,7 +75,15 @@ API 优先读取 Redis，缓存未命中时查询 PostgreSQL 并回填缓存。
 
 [按 Agent 选择安装方式](https://tt-a1i.github.io/archify/start.html?agent=cursor&type=architecture) · [安装细节与更新检查](#快速开始)
 
+<a id="sponsors"></a>
+
 ## ❤️ 赞助伙伴
+
+<p align="center">
+  <a href="https://www.kimi.com/?aff=archify"><img src="docs/assets/sponsors/archify-kimi-work.png" alt="Archify × Kimi Work 合作海报" width="800" /></a>
+</p>
+
+**Archify × Kimi Work。** 在 Kimi Work 插件商店搜索 **「可交互架构图」**，用一句话描述你的系统，即可生成可交互的图。**[在 Kimi Work 中使用 →](https://www.kimi.com/?aff=archify)**
 
 <table>
 <tr>
@@ -151,8 +161,6 @@ Export 菜单支持复制 PNG，并下载静态或动态格式：
 
 ![导出菜单](docs/assets/archify-menu.png)
 
-需要用于 README、Release 或社交平台的标准 1200×630 图片时，使用 **Copy Share Card**。
-
 路径解析后，**Export → Route Share Card** 会把真实路径下载为 1200×630 PNG，并保留完整拓扑上下文。
 
 ![Route Share Card：突出 Users 到 API Server 的精确路径，同时保留完整架构作为上下文](docs/assets/archify-route-share-card.png)
@@ -167,7 +175,7 @@ Export 菜单支持复制 PNG，并下载静态或动态格式：
 
 ## 快速开始
 
-**当前开发版本：** `v2.17.0-dev.1`。详见[版本历史](CHANGELOG.md#unreleased)。
+**当前稳定版本：** `v3.0.0`。详见[版本历史](CHANGELOG.md#300--2026-09-28)。
 
 ### 1. 安装
 
@@ -192,7 +200,7 @@ npx skills use tt-a1i/archify@archify --agent codex
 
 DeepSeek Harness（社区集成、显式启用）：运行 `dsh plugin --profile web add @tt-a1i/archify-dsh@0.1.0`；参见[兼容范围、限制与安全说明](integrations/deepseek-harness/README.md)。[Agent 切换器](https://tt-a1i.github.io/archify/start.html?agent=cursor&type=architecture)只为 `cursor`、`codex`、`claude-code` 和 `opencode` 生成命令。
 
-安装后的 Skill 包含一个低频、失败静默的发布检查，它最多只显示可选更新提醒，绝不会自行下载或安装更新。一次成功检查后，下次网络请求通常约在 72 小时（±20%）后发出；检查失败后，活跃使用可能在首次 6 小时、后续 24 小时退避到期时重试。请求只访问 `https://tt-a1i.github.io/archify/skill-updates/archify/stable.json`。服务端会自然获得 IP、请求时间和常规 HTTP 元数据；检查器不会发送本地版本、Agent、项目数据、用户输入、账户/设备标识，也不会保存或回传 ETag。是否更新以及何时更新始终由你决定。如需完全关闭检查（包括网络请求和提醒状态写入），请在 Agent 环境中设置 `ARCHIFY_UPDATE_CHECK_DISABLED=1`。
+安装后的 Skill 包含一个低频、失败静默的发布检查，它最多只显示可选更新提醒，绝不会自行下载或安装更新。一次成功检查后，下次网络请求通常约在 24 小时（±20%）后发出；检查失败后，活跃使用可能在首次 6 小时、后续 24 小时退避到期时重试。请求只访问 `https://tt-a1i.github.io/archify/skill-updates/archify/stable.json`。服务端会自然获得 IP、请求时间和常规 HTTP 元数据；检查器不会发送本地版本、Agent、项目数据、用户输入、账户/设备标识，也不会保存或回传 ETag。是否更新以及何时更新始终由你决定。如需完全关闭检查（包括网络请求和提醒状态写入），请在 Agent 环境中设置 `ARCHIFY_UPDATE_CHECK_DISABLED=1`。
 
 </details>
 
@@ -334,7 +342,7 @@ node bin/archify.mjs deliver workflow examples/agent-tool-call.workflow.json /tm
 }
 ```
 
-不设置 `animation` 时结果完全静态；`classic` 始终是默认视觉预设。设计评审、发布说明和技术文档可以显式选择 `editorial`，获得暖纸张与深墨色的编辑风格，同时保持几何完全不变。将 `meta.locale` 设为 `en` 或 `zh-CN`，可选择 `<html lang>`、默认图例、无障碍文案和所有固定 Viewer UI。作者编写的标题、节点、关系和卡片不会被机器翻译。未带该字段的旧文件仍然有效，并默认使用英文。对于其他任何创作语言，应省略 `meta.locale`、保持 authored content 使用用户要求的语言，并主动告知用户固定 Viewer UI 与 `<html lang>` 回退为英文，因此该成品不属于完整本地化。
+不设置 `animation` 时结果完全静态；`classic` 始终是默认视觉预设。设计评审、发布说明和技术文档可以显式选择 `editorial`，获得暖纸张与深墨色的编辑风格，同时保持几何完全不变。将 `meta.locale` 设为任意合法语言标签，可选择 `<html lang>`、默认图例、无障碍文案和所有固定 Viewer UI。`en` 与 `zh-CN` 已内置；西班牙语等其他语言需同时提供 `meta.translations`（规范消息键到译文字符串的映射，`examples/locales/es.json` 是完整示例），否则渲染器回退为英文并在 stderr 中说明。作者编写的标题、节点、关系和卡片不会被机器翻译。未带该字段的旧文件仍然有效，并默认使用英文。对于既未内置也未提供 `meta.translations` 的创作语言，应省略 `meta.locale`、保持 authored content 使用用户要求的语言，并主动告知用户固定 Viewer UI 与 `<html lang>` 回退为英文，因此该成品不属于完整本地化。
 
 </details>
 
