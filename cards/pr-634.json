@@ -1,0 +1,10 @@
+{
+  "templateVersion": 1,
+  "repository": "tt-a1i/archify",
+  "number": 634,
+  "author": "Momoyeyu",
+  "title": "feat(benchmarks): repair-rounds 套件（修复轮次 / 晚发现率 / token 成本）",
+  "mergedAt": "2026-09-29T16:23:58Z",
+  "mergeCommit": "c4c6b3ba4ec8a55f10f81e371e9c1b52053ab9a0",
+  "url": "https://github.com/tt-a1i/archify/pull/634"
+}
