@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="generator" content="archify 2.17.0-dev.1">
+  <meta name="generator" content="archify 3.0.0">
   <meta name="archify-reader-contract" content="declared-wide-v1">
   <title>[PROJECT NAME] Architecture Diagram</title>
   <script>
@@ -937,22 +937,36 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           beacon.classList.add('source-evidence-beacon');
           beacon.setAttribute('data-source-evidence-beacon', '');
           beacon.setAttribute('aria-hidden', 'true');
-          var brandOffset = node.hasAttribute('data-node-brand') ? 24 : 0;
-          beacon.setAttribute('transform', 'translate(' + (box.x + box.width - 35 - brandOffset) + ' ' + (box.y + 5) + ')');
+          var brandOffset = node.hasAttribute('data-node-brand') ? 22 : 0;
           var title = document.createElementNS(svgNamespace, 'title');
           title.textContent = label;
           var plate = document.createElementNS(svgNamespace, 'rect');
-          plate.setAttribute('width', '30');
-          plate.setAttribute('height', '12');
-          plate.setAttribute('rx', '6');
+          plate.setAttribute('height', '13');
+          plate.setAttribute('rx', '6.5');
           var text = document.createElementNS(svgNamespace, 'text');
-          text.setAttribute('x', '15');
-          text.setAttribute('y', '8.25');
+          text.setAttribute('y', '9.4');
           text.textContent = viewerText('viewer.passport.sourceMarker') + ' ' + count;
           beacon.appendChild(title);
           beacon.appendChild(plate);
           beacon.appendChild(text);
           node.appendChild(beacon);
+
+          // Measure the real glyph advance, then clamp the plate between 24
+          // and 36px; a still-wider label is squeezed with textLength so the
+          // badge never overlaps the neighbouring brand mark or sigil.
+          var textWidth = 16;
+          try {
+            var measured = text.getComputedTextLength();
+            if (Number.isFinite(measured) && measured > 0) textWidth = measured;
+          } catch (_) {}
+          var plateWidth = Math.min(36, Math.max(24, textWidth + 8));
+          if (textWidth > plateWidth - 8) {
+            text.setAttribute('textLength', String(plateWidth - 8));
+            text.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+          }
+          plate.setAttribute('width', String(plateWidth));
+          text.setAttribute('x', String(plateWidth / 2));
+          beacon.setAttribute('transform', 'translate(' + (box.x + box.width - 6 - brandOffset - plateWidth) + ' ' + (box.y + 4.5) + ')');
 
           var originalLabel = node.getAttribute('aria-label') || '';
           node.setAttribute('data-source-evidence-count', String(count));

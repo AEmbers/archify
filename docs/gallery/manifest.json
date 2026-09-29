@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generator": "scripts/build-gallery.mjs",
-  "archifyVersion": "2.17.0-dev.1",
+  "archifyVersion": "3.0.0",
   "entryCount": 11,
   "checkCount": 99,
   "entries": [
@@ -19,8 +19,8 @@
       "engineeringProfile": null,
       "nodeCount": 12,
       "edgeCount": 11,
-      "artifactBytes": 764762,
-      "artifactSha256": "342bb254d33afbf66f53019ff87a0bbfba24a2f914e216445079640177f121be",
+      "artifactBytes": 767770,
+      "artifactSha256": "5ba15b8f76960d92e60690dbb7e793f54d60f88eb17841c336b36d2863c40220",
       "sourceBytes": 4939,
       "sourceSha256": "d67965d50872c97e4ff3476271e645bf19fab6b3ab44e111bdb44b063e3aa36f",
       "checks": [
@@ -154,8 +154,8 @@
       "engineeringProfile": "deployment-ownership",
       "nodeCount": 12,
       "edgeCount": 12,
-      "artifactBytes": 767489,
-      "artifactSha256": "c190d78bd2f41897966b6c6b8eab7d2fe09738eb55090228148e69cec2eb653d",
+      "artifactBytes": 770497,
+      "artifactSha256": "f31c14c6de003296cf2ff95f6c752b18aff66515173f6408c7129dc6270d2477",
       "sourceBytes": 4734,
       "sourceSha256": "cb54bad2dfd0c2d02aa5b496bde6839789a0f07f23062343c4458b8d38806c13",
       "checks": [
@@ -287,10 +287,10 @@
       "engineeringProfile": null,
       "nodeCount": 7,
       "edgeCount": 12,
-      "artifactBytes": 759256,
-      "artifactSha256": "8628514c61bb03d6fc320e044de348836ea308c4bb7d543a3205cbd92e34e642",
+      "artifactBytes": 762310,
+      "artifactSha256": "f60bbf5e7788173a7fa2eb27551333b33576d8aed0b2325440d90e0042e3bf3b",
       "sourceBytes": 3805,
-      "sourceSha256": "f5c2e44f9a44000adc7c3b3040c4fcd88fe50b7cf8761302c21eb0c184e5780a",
+      "sourceSha256": "f8486daa803fff6c295cecca4604c561fbbf9acb2e83326022b5a87639e8afe6",
       "checks": [
         {
           "name": "single_svg",
@@ -374,6 +374,18 @@
           "measured": false,
           "reviewSuggested": false
         },
+        "sequenceColumnSpace": {
+          "measured": true,
+          "columnFit": "spread",
+          "participantCount": 7,
+          "occupiedRight": 1040,
+          "viewBoxLeft": 0,
+          "canvasWidth": 1080,
+          "emptyRightPx": 40,
+          "emptyRightRatio": 0.037,
+          "typicalParticipantWidth": 113,
+          "reviewSuggested": false
+        },
         "desktopReadability": {
           "budgetBasis": "legacy-930",
           "readerContract": "declared-wide-v1",
@@ -409,8 +421,8 @@
       "engineeringProfile": null,
       "nodeCount": 10,
       "edgeCount": 10,
-      "artifactBytes": 760276,
-      "artifactSha256": "cf098dffb2a1b481ef0a51394c47db7fd7fa99ea7696f4808fe11b475ccdcb57",
+      "artifactBytes": 763284,
+      "artifactSha256": "492300dfcb917aff1202b84c9d4763965a6de38d1e63dace7f927b9e2bdeef17",
       "sourceBytes": 4510,
       "sourceSha256": "dbd5c174af66296caec372e7214cf4df7158b50a563508e16826b95ab8d1cd6c",
       "checks": [
@@ -549,8 +561,8 @@
       "engineeringProfile": null,
       "nodeCount": 11,
       "edgeCount": 10,
-      "artifactBytes": 757596,
-      "artifactSha256": "e0fe9abd7c928d64a0d572a91c65d14aded4cd0af36c4e39fe44b4db023190ff",
+      "artifactBytes": 760604,
+      "artifactSha256": "4ee90ef5e91dbf7cb4d90145f00f7f012b38205134934749f2c0f681192bf0ae",
       "sourceBytes": 4723,
       "sourceSha256": "630be98449925d2716ecb8439f404b2bff5fe65ba905b0ad0baea6d96890c526",
       "checks": [
@@ -735,8 +747,8 @@
       "engineeringProfile": null,
       "nodeCount": 10,
       "edgeCount": 10,
-      "artifactBytes": 761596,
-      "artifactSha256": "2ec47a1357520811d2b444f913fa87b93ae7df1c05f33e1c9e0421d55025d9d2",
+      "artifactBytes": 764604,
+      "artifactSha256": "10068c5794ea578e08b93c9db3e77b268813657d82fad8e8b605806634d0334d",
       "sourceBytes": 5035,
       "sourceSha256": "8a635db9e51a5b1a8d2955b9d66f5b9a450e0a298432ce8f2e2f0be11f372e05",
       "checks": [
@@ -870,8 +882,8 @@
       "engineeringProfile": null,
       "nodeCount": 7,
       "edgeCount": 14,
-      "artifactBytes": 758337,
-      "artifactSha256": "99989bf39efb75d98a1bf28386940eb7036f4a4102a273af25dd67d5f46f35ab",
+      "artifactBytes": 761396,
+      "artifactSha256": "7910273dd5e626b7ed002bf141027f01fd984508fee0b81f0274ffe963304547",
       "sourceBytes": 3766,
       "sourceSha256": "b8c6c52f1763ede2933c77deb8da59b3e06917bc41d27e66df896136456b859a",
       "checks": [
@@ -957,6 +969,18 @@
           "measured": false,
           "reviewSuggested": false
         },
+        "sequenceColumnSpace": {
+          "measured": true,
+          "columnFit": "fixed",
+          "participantCount": 7,
+          "occupiedRight": 753,
+          "viewBoxLeft": 0,
+          "canvasWidth": 820,
+          "emptyRightPx": 67,
+          "emptyRightRatio": 0.082,
+          "typicalParticipantWidth": 86,
+          "reviewSuggested": false
+        },
         "desktopReadability": {
           "budgetBasis": "legacy-930",
           "readerContract": "declared-wide-v1",
@@ -1010,8 +1034,8 @@
       "engineeringProfile": null,
       "nodeCount": 12,
       "edgeCount": 12,
-      "artifactBytes": 765516,
-      "artifactSha256": "6ce375a2f5a85f730a9b0c9c38aaa24c98353fe3a00260e71613ba4b23cae1c8",
+      "artifactBytes": 768524,
+      "artifactSha256": "b5299a516c13c67e40cf5c184651c9ba18a9ae3ac72c77a3f6ae488fc4ebeb50",
       "sourceBytes": 4769,
       "sourceSha256": "3bdd77674282009c7c68d588cf8a3c495bc98a3be1b9c45327fd1801a6f83a23",
       "checks": [
@@ -1162,8 +1186,8 @@
       "engineeringProfile": null,
       "nodeCount": 10,
       "edgeCount": 6,
-      "artifactBytes": 754654,
-      "artifactSha256": "d7d3c23eeae2697355baf2dde9d583b54522070efde9f33f23e8a51c8d747c1a",
+      "artifactBytes": 758914,
+      "artifactSha256": "22756dbffec458b34edd4466f36c9f6c4d55f0f569ac9f5476e81dc9c5f153fd",
       "sourceBytes": 3405,
       "sourceSha256": "230242a7557663877766c43a9fe7cffe8b4fb66e4866457dccd24c63175b4917",
       "checks": [
@@ -1327,16 +1351,16 @@
       "input": "gallery/sources/deployment-release.lifecycle.json",
       "artifact": "gallery/artifacts/deployment-release.lifecycle.html",
       "focus": "live",
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "visualPreset": "signal-flow",
       "animation": "trace",
       "engineeringProfile": null,
       "nodeCount": 11,
-      "edgeCount": 6,
-      "artifactBytes": 756191,
-      "artifactSha256": "1bdb9dbe427e5ed74951571b54d09d4a1d7d846c70a5d2d09cbcf168b85a3813",
-      "sourceBytes": 3602,
-      "sourceSha256": "a1afe998f80427aac91285a06515610ae2b2da8a3c3be5419f51fe2f57671ba9",
+      "edgeCount": 11,
+      "artifactBytes": 765969,
+      "artifactSha256": "38586d0e59c5289c22d78f91d3455118ac06f7f38a84d0770bbe834db47f4bbc",
+      "sourceBytes": 3507,
+      "sourceSha256": "f565a8acfebdb21453e2bccd82d3760b4736e38fe194fb2f0804b57817eba813",
       "checks": [
         {
           "name": "single_svg",
@@ -1391,16 +1415,16 @@
           "containerBorderRuns": 0,
           "labelRouteClearanceIssues": 0,
           "labelCanvasOverflowIssues": 0,
-          "minLabelRouteClearance": null,
+          "minLabelRouteClearance": 21,
           "desktopReadabilityIssues": 0,
           "viewportHeightIssues": 0,
-          "minProjectedNodeTextPx": 6.642857142857143,
-          "maxBends": 0,
+          "minProjectedNodeTextPx": 6.91449814126394,
+          "maxBends": 2,
           "routesOverSuggestedBends": 0,
           "maxStretch": 1,
           "routesOverSuggestedStretch": 0,
-          "minSegmentPx": 90,
-          "minInteriorSegmentPx": null,
+          "minSegmentPx": 60,
+          "minInteriorSegmentPx": 174,
           "shortSegmentCount": 0,
           "shortEndpointSegmentCount": 0,
           "shortInteriorSegmentCount": 0,
@@ -1434,9 +1458,9 @@
             "kind": "node",
             "id": "queued"
           },
-          "minimumSourceTextPx": 7,
-          "minimumProjectedTextPx": 6.642857142857143,
-          "semanticTextCount": 22
+          "minimumSourceTextPx": 8,
+          "minimumProjectedTextPx": 6.91449814126394,
+          "semanticTextCount": 24
         },
         "issues": []
       }
@@ -1455,8 +1479,8 @@
       "engineeringProfile": null,
       "nodeCount": 10,
       "edgeCount": 9,
-      "artifactBytes": 759302,
-      "artifactSha256": "21c54b3f492a86182a55a814f4b7fad4e01c5ada81064db7501ad86a139f81b9",
+      "artifactBytes": 762310,
+      "artifactSha256": "119788c029b54228c2f46d8f58aa80194fa0d75787306da04ce2155913fa1aa7",
       "sourceBytes": 3197,
       "sourceSha256": "95e051b27a9e4a3307e194c0f666fca4af51470be7e2228d400ff48aea5b353b",
       "checks": [

@@ -310,12 +310,21 @@ Stages express transformation or custody. Rows separate parallel streams. Label 
 
 ### Lifecycle
 
-Main phases use columns `0..4`; event and terminal bands use columns `0..2`.
-Event/terminal column `N` aligns to the same x coordinate as main column
-`N + 2`. A recoverable failure needs a real transition back to an active state.
-A card saying “retry” is not topology.
-Every lane other than `main` and `terminal` shares one middle band; states in
-the same column there need distinct `yOffset` values.
+Schema v2 (new diagrams): each populated lane is one row, `main` first,
+`terminal` last, others in `lanes[]` order. `col` `0..4` is one shared x grid,
+so a state placed in the column of the state it leaves gets a straight vertical
+transition. Every transition, including the main path, is authored; there is no
+implied rail. The renderer sizes the canvas, widens a column gap for a
+same-row label, and routes automatic transitions orthogonally through row gaps.
+Keep labels short: a gap carrying several parallel lines has little room.
+
+Schema v1 (legacy): main phases use columns `0..4`; event and terminal bands
+use columns `0..2`, and event/terminal column `N` aligns with main column
+`N + 2`. Every lane other than `main` and `terminal` shares one middle band;
+states in the same column there need distinct `yOffset` values.
+
+In both versions a recoverable failure needs a real transition back to an
+active state. A card saying “retry” is not topology.
 
 ## Repository evidence
 

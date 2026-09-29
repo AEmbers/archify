@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="generator" content="archify 2.17.0-dev.1">
+  <meta name="generator" content="archify 3.0.0">
   <meta name="archify-reader-contract" content="declared-wide-v1">
   <title>Incident Response Runbook Diagram</title>
   <script>
@@ -607,6 +607,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       width: 100%;
       max-width: var(--archify-reader-width, 1440px);
       margin: 0 auto;
+    }
+    html[data-reader-narrow="true"]:not([data-present="true"]) .diagram-container > svg {
+      min-width: 0;
+      max-width: var(--archify-diagram-max-width);
+      margin-inline: auto;
     }
     @media (min-width: 768px) and (max-height: 920px) {
       .header { margin-bottom: 1rem; }
@@ -4173,8 +4178,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
        them before producing the canonical SVG or any derived visual. */
     .source-evidence-beacon {
       pointer-events: none;
-      opacity: 0.76;
-      transition: opacity 160ms ease, filter 160ms ease;
+      opacity: 1;
+      transition: filter 160ms ease;
     }
     .source-evidence-beacon rect {
       fill: color-mix(in srgb, var(--mask) 92%, var(--backend-stroke));
@@ -4184,8 +4189,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
     }
     .source-evidence-beacon text {
       fill: var(--backend-stroke);
-      font-size: 5.5px;
-      font-weight: 800;
+      font-size: 7px;
+      font-weight: 700;
       letter-spacing: 0.06em;
       text-anchor: middle;
       text-transform: uppercase;
@@ -7486,22 +7491,36 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           beacon.classList.add('source-evidence-beacon');
           beacon.setAttribute('data-source-evidence-beacon', '');
           beacon.setAttribute('aria-hidden', 'true');
-          var brandOffset = node.hasAttribute('data-node-brand') ? 24 : 0;
-          beacon.setAttribute('transform', 'translate(' + (box.x + box.width - 35 - brandOffset) + ' ' + (box.y + 5) + ')');
+          var brandOffset = node.hasAttribute('data-node-brand') ? 22 : 0;
           var title = document.createElementNS(svgNamespace, 'title');
           title.textContent = label;
           var plate = document.createElementNS(svgNamespace, 'rect');
-          plate.setAttribute('width', '30');
-          plate.setAttribute('height', '12');
-          plate.setAttribute('rx', '6');
+          plate.setAttribute('height', '13');
+          plate.setAttribute('rx', '6.5');
           var text = document.createElementNS(svgNamespace, 'text');
-          text.setAttribute('x', '15');
-          text.setAttribute('y', '8.25');
+          text.setAttribute('y', '9.4');
           text.textContent = viewerText('viewer.passport.sourceMarker') + ' ' + count;
           beacon.appendChild(title);
           beacon.appendChild(plate);
           beacon.appendChild(text);
           node.appendChild(beacon);
+
+          // Measure the real glyph advance, then clamp the plate between 24
+          // and 36px; a still-wider label is squeezed with textLength so the
+          // badge never overlaps the neighbouring brand mark or sigil.
+          var textWidth = 16;
+          try {
+            var measured = text.getComputedTextLength();
+            if (Number.isFinite(measured) && measured > 0) textWidth = measured;
+          } catch (_) {}
+          var plateWidth = Math.min(36, Math.max(24, textWidth + 8));
+          if (textWidth > plateWidth - 8) {
+            text.setAttribute('textLength', String(plateWidth - 8));
+            text.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+          }
+          plate.setAttribute('width', String(plateWidth));
+          text.setAttribute('x', String(plateWidth / 2));
+          beacon.setAttribute('transform', 'translate(' + (box.x + box.width - 6 - brandOffset - plateWidth) + ' ' + (box.y + 4.5) + ')');
 
           var originalLabel = node.getAttribute('aria-label') || '';
           node.setAttribute('data-source-evidence-count', String(count));
@@ -9472,24 +9491,34 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         var style = window.getComputedStyle(element);
         return element.getBoundingClientRect().height + number(style.marginTop) + number(style.marginBottom);
       }
+      // Smallest scale that keeps node text at the requested floor and
+      // context relationship labels readable. A declared wide reader holds
+      // relationship labels to the requested floor too; every other reader
+      // still keeps them at the 6px hard floor the browser gate enforces, so
+      // a first-screen fit can never push them below it.
       function minimumReadableScale() {
-        var sourceMinimum = null;
-        var selectors = [
-          'text[data-node-label], text[data-boundary-label], text[data-detail="context"]'
-        ];
-        if (measuredHeightFit && ratio >= WIDE_RATIO && Number.isFinite(declaredMinimumText)) {
-          selectors.push('g[data-detail="context"][data-edge-from][data-edge-to] > text');
-        }
-        Array.from(svg.querySelectorAll(selectors.join(', '))).forEach(function (text) {
-          if (text.getAttribute('data-detail') === 'context' && !text.closest('[data-node-id]')) return;
+        var nodeMinimum = null;
+        var edgeMinimum = null;
+        var selectors = 'text[data-node-label], text[data-boundary-label], text[data-detail="context"], g[data-detail="context"] text';
+        Array.from(svg.querySelectorAll(selectors)).forEach(function (text) {
+          if (text.getAttribute('data-detail') === 'fine' || text.closest('[data-detail="fine"]')) return;
           var sourceFontPx = parseFloat(text.getAttribute('font-size') || '');
-          if (Number.isFinite(sourceFontPx)) {
-            sourceMinimum = sourceMinimum == null ? sourceFontPx : Math.min(sourceMinimum, sourceFontPx);
+          if (!Number.isFinite(sourceFontPx)) return;
+          var primary = text.hasAttribute('data-node-label') || text.hasAttribute('data-boundary-label');
+          var context = text.getAttribute('data-detail') === 'context' || Boolean(text.closest('g[data-detail="context"]'));
+          if (!primary && context && text.closest('[data-edge-from][data-edge-to]')) {
+            edgeMinimum = edgeMinimum == null ? sourceFontPx : Math.min(edgeMinimum, sourceFontPx);
+          } else if (primary || text.closest('[data-node-id]')) {
+            nodeMinimum = nodeMinimum == null ? sourceFontPx : Math.min(nodeMinimum, sourceFontPx);
           }
         });
-        return sourceMinimum != null
-          ? Math.min(1, requestedMinimumText / sourceMinimum)
-          : 1;
+        var edgeTarget = measuredHeightFit && ratio >= WIDE_RATIO && Number.isFinite(declaredMinimumText)
+          ? requestedMinimumText
+          : MIN_PROJECTED_NODE_TEXT_PX;
+        var scale = 0;
+        if (nodeMinimum != null) scale = Math.max(scale, requestedMinimumText / nodeMinimum);
+        if (edgeMinimum != null) scale = Math.max(scale, edgeTarget / edgeMinimum);
+        return scale > 0 ? Math.min(1, scale) : 1;
       }
       var sourcePrimary = null;
       if (svg) Array.from(svg.querySelectorAll('text[data-node-label]')).forEach(function (text) {
@@ -9522,6 +9551,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
       }
       function clear() {
         html.style.removeProperty('--archify-reader-width');
+        html.style.removeProperty('--archify-diagram-max-width');
+        html.removeAttribute('data-reader-narrow');
         html.removeAttribute('data-reader-layout');
         html.removeAttribute('data-reader-overflow');
         setRail(false);
@@ -9583,11 +9614,25 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
             number(diagramStyle.borderTopWidth) + number(diagramStyle.borderBottomWidth)
         };
       }
+      // `width` is the diagram's reading width. The page shell never narrows
+      // below the desktop reader floor, so a narrow, tall diagram keeps a
+      // usable header, toolbar, and controls; its SVG is centred instead.
       function applyWidth(width, minWidth) {
         var rounded = Math.max(Math.ceil(minWidth || 0), Math.round(width));
         if (Math.abs(rounded - lastWidth) < 1) return false;
         lastWidth = rounded;
-        html.style.setProperty('--archify-reader-width', rounded + 'px');
+        var shellFloor = Math.min(MIN_READER_WIDTH, Math.max(0, window.innerWidth - chromeMetrics().bodyX));
+        html.style.setProperty('--archify-reader-width', Math.max(rounded, shellFloor) + 'px');
+        if (rounded < shellFloor) {
+          // `rounded` already includes a docked rail and its gap; the SVG cap
+          // is only the diagram's share, not the space beside it.
+          var railShare = html.getAttribute('data-reader-rail') === 'true' ? RAIL_WIDTH + RAIL_GAP : 0;
+          html.style.setProperty('--archify-diagram-max-width', Math.max(1, rounded - railShare - chromeMetrics().diagramX) + 'px');
+          html.setAttribute('data-reader-narrow', 'true');
+        } else {
+          html.style.removeProperty('--archify-diagram-max-width');
+          html.removeAttribute('data-reader-narrow');
+        }
         html.setAttribute('data-reader-layout', 'adaptive');
         return true;
       }
@@ -9652,10 +9697,11 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           if (collapsedPreference === '1' || (collapsedPreference !== '0' && !comfortable)) mode = 'collapsed';
           else mode = fitsReadable ? 'true' : 'overlay';
         }
-        // With notes below the fold, the diagram may trade the renderer's
-        // comfortable primary size down to the rail's 12px floor so it and its
-        // controls fit the first screen; taller graphs still scroll.
-        if (mode === 'bottom' && primaryWidth > 0) primaryWidth = labelWidth(Math.min(RAIL_COMFORT_PRIMARY_PX, declaredPrimaryText));
+        // With notes below the fold, the first screen belongs to the whole
+        // diagram and its controls: it may shrink past the comfortable primary
+        // size down to the renderer's readable text floor, and zoom restores
+        // detail. Only a graph taller than that floor allows still scrolls.
+        if (mode === 'bottom') primaryWidth = 0;
         if (primaryWidth > 0) minWidth = Math.max(minWidth, Math.min(maxWidth, primaryWidth + chrome.diagramX));
         var docked = mode === 'true';
         setRail(mode);

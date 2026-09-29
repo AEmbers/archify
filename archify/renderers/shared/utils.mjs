@@ -33,12 +33,13 @@ const SIGIL_TONE = {
   frontend: 'frontend',
   start: 'frontend',
   backend: 'backend',
-  active: 'backend',
+  active: 'frontend',
   database: 'database',
-  success: 'database',
+  success: 'backend',
   cloud: 'cloud',
   waiting: 'cloud',
   security: 'security',
+  decision: 'database',
   failure: 'security',
   messagebus: 'messagebus',
   external: 'external',
@@ -88,6 +89,10 @@ const SIGIL_SHAPE = {
 export const SEMANTIC_SIGIL_INSET = 6;
 export const SEMANTIC_SIGIL_SIZE = 11;
 export const SEMANTIC_SIGIL_FOOTPRINT = SEMANTIC_SIGIL_INSET + SEMANTIC_SIGIL_SIZE;
+// The viewer installs a runtime "sources" beacon on the node's top-right
+// rail, just left of the brand mark. Layout must reserve the same footprint
+// so labels never sit under the badge.
+export const SOURCE_BADGE_FOOTPRINT = 38;
 
 export function renderSemanticSigil(kind, { x, y, size = SEMANTIC_SIGIL_SIZE, icon } = {}) {
   if (icon === 'none') return '';

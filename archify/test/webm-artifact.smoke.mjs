@@ -413,7 +413,7 @@ try {
       assert.deepEqual(dataflow.aria, ['Inspect data store, 1 node', null]);
       assert.deepEqual(dataflow.counts, ['1', null]);
       assert.equal(dataflow.tabStops, 1);
-      const lifecycle = await inspectKinds(outputs.lifecycle, ['start', 'active', 'success'], theme);
+      const lifecycle = await inspectKinds(outputs.lifecycle, ['start', 'active', 'success', 'final'], theme);
       assert.equal(lifecycle.bridge, true);
     }
 

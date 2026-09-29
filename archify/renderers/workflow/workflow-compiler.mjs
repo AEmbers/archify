@@ -1295,6 +1295,7 @@ function createAutomaticSideSelection({
 function compileWorkflowInternal({
   workflow: inputWorkflow,
   qualityProfile,
+  sourceEvidence,
   discoverFixes = true,
   layoutFeedback = {},
 } = {}) {
@@ -4696,7 +4697,7 @@ function renderNode(node) {
   if (hasSub) textRows.push({ text: node.sublabel, font: sublabelFontSize, y: 38 });
   if (node.tag) textRows.push({ text: node.tag, font: tagFontSize, y: node.height - 12 });
   const labelLayout = nodeLabelLayout({ width: node.width, height: node.height, rows: textRows,
-    brand: Boolean(brandMarkFor(node)) });
+    brand: Boolean(brandMarkFor(node)), source: Boolean(sourceEvidence?.nodes?.[node.id]?.length) });
   const sub = hasSub
     ? `\n          <text data-detail="context" x="${node.cx}" y="${node.y + labelLayout.ys[1]}" class="t-muted" font-size="${sublabelFontSize}" text-anchor="middle">${esc(node.sublabel)}</text>`
     : '';
@@ -4850,13 +4851,14 @@ function feedbackFailure(request) {
   return compilerFailure('readable-v2', diagnostics, message);
 }
 
-function compileWorkflowWithFeedback({ workflow, qualityProfile, discoverFixes = true } = {}) {
+function compileWorkflowWithFeedback({ workflow, qualityProfile, sourceEvidence, discoverFixes = true } = {}) {
   let layoutFeedback = {};
   for (let attempt = 0; attempt <= MAX_READABLE_LAYOUT_FEEDBACK_ROUNDS; attempt += 1) {
     try {
       return compileWorkflowInternal({
         workflow,
         qualityProfile,
+        sourceEvidence,
         discoverFixes,
         layoutFeedback,
       });
@@ -4906,6 +4908,6 @@ function compileWorkflowWithFeedback({ workflow, qualityProfile, discoverFixes =
   throw new Error('unreachable readable-v2 layout feedback state');
 }
 
-export function compileWorkflow({ workflow, qualityProfile } = {}) {
-  return compileWorkflowWithFeedback({ workflow, qualityProfile });
+export function compileWorkflow({ workflow, qualityProfile, sourceEvidence } = {}) {
+  return compileWorkflowWithFeedback({ workflow, qualityProfile, sourceEvidence });
 }

@@ -124,7 +124,14 @@ output.
 Workflow supports schema versions 1 and 2. Version 1 remains the fixed-layout
 compatibility contract; version 2 opts into the readable workflow compiler and
 can be produced explicitly with `archify migrate workflow ... --to-schema 2`.
-The other four diagram schemas keep `schema_version` pinned to `1`; they have
+Lifecycle also supports versions 1 and 2 with the same fields. Version 1 keeps
+the fixed three-band layout; version 2 renders one row per lane on a shared
+column grid (see the [lifecycle renderer](../renderers/lifecycle/README.md)).
+Lifecycle has no migration command: to adopt v2, set `schema_version: 2`,
+re-place lower-lane `col` values on the shared grid (v1 column `N` sat under
+main column `N + 2`), and drop coordinates authored for the v1 canvas
+(`viewBox`, `via`, `channelX`, `channelY`, `labelAt`).
+The other three diagram schemas keep `schema_version` pinned to `1`; they have
 no schema-version migration command. For any of the five diagram types, repair
 a legacy missing or nonportable `meta.output` in the source and run `validate`.
 For a workflow v1-to-v2 migration specifically, `migrate workflow` also accepts

@@ -5,6 +5,7 @@ import { createSpatialGrid } from '../shared/spatial-grid.mjs';
 // It never routes an edge, moves a node, expands the canvas, or rewrites input.
 export function placeAutomaticLabels({
   labels, routes, components, titles, viewBox, placementBottom = viewBox[1], fallbackRing = true, keepFallbackNearRoute = false,
+  gridSweep = false,
 }) {
   const placed = [...labels];
   const obstacles = [...components, ...titles];
@@ -50,15 +51,80 @@ export function placeAutomaticLabels({
   const rectAt = (label, lx, ly) => ({
     ...label, lx, ly, x: lx - label.width / 2, y: ly - 10,
   });
+  // An opted-in grid layout runs parallel lines through shared gaps. Rank
+  // every position along all of the label's own segments: beside the line
+  // first, then centred on its own line (the plate interrupts only that
+  // line), then stepping outward past neighbouring parallels.
+  const gridCandidates = (label) => {
+    const fractions = [0.5, 0.25, 0.75, 0.375, 0.625, 0.125, 0.875];
+    const ranked = [];
+    // A close parallel of another relationship on one side (a reciprocal
+    // pair) makes a label on that side read as the neighbour's: prefer the
+    // far side.
+    const parallelOnLowSide = (a, b, axis) => {
+      const across = 1 - axis;
+      const [low, high] = [Math.min(a[axis], b[axis]), Math.max(a[axis], b[axis])];
+      let nearest = null;
+      for (const other of segments) {
+        if (other.relationIndex === label.relationIndex) continue;
+        if (Math.abs(other.start[across] - other.end[across]) > 0.0001) continue;
+        const distance = other.start[across] - a[across];
+        if (Math.abs(distance) < 0.0001 || Math.abs(distance) > 36) continue;
+        const overlap = Math.min(high, Math.max(other.start[axis], other.end[axis]))
+          - Math.max(low, Math.min(other.start[axis], other.end[axis]));
+        if (overlap <= 0) continue;
+        if (nearest === null || Math.abs(distance) < Math.abs(nearest)) nearest = distance;
+      }
+      return nearest !== null && nearest < 0;
+    };
+    for (const { start: a, end: b } of segments.filter(segment => segment.relationIndex === label.relationIndex)) {
+      if (Math.abs(a[1] - b[1]) < 0.0001 && Math.abs(a[0] - b[0]) >= label.width + 16) {
+        const [above, below] = parallelOnLowSide(a, b, 0) ? [1, 0] : [0, 1];
+        for (const fraction of fractions) {
+          const x = a[0] + (b[0] - a[0]) * fraction;
+          if (Math.min(Math.abs(x - a[0]), Math.abs(x - b[0])) < label.width / 2 + 6) continue;
+          ranked.push([above, x, a[1] - 10], [below, x, a[1] + 20], [2, x, a[1] + 3], [3, x, a[1] - 18], [3, x, a[1] + 28]);
+        }
+      } else if (Math.abs(a[0] - b[0]) < 0.0001 && Math.abs(a[1] - b[1]) >= label.height + 16) {
+        const leftFirst = !parallelOnLowSide(a, b, 1);
+        for (const fraction of fractions) {
+          const y = a[1] + (b[1] - a[1]) * fraction;
+          if (Math.min(Math.abs(y - a[1]), Math.abs(y - b[1])) < label.height / 2 + 6) continue;
+          ranked.push([2, a[0], y + 3]);
+          [6, 14, 22, 30, 38, 46, 54].forEach((offset, step) => {
+            const tier = step === 0 ? 0 : step === 1 ? 1 : 2 + step;
+            const left = [tier + (leftFirst ? 0 : 0.5), a[0] - label.width / 2 - offset, y + 3];
+            const right = [tier + (leftFirst ? 0.5 : 0), a[0] + label.width / 2 + offset, y + 3];
+            ranked.push(left, right);
+          });
+        }
+      }
+    }
+    return ranked.map((entry, order) => [...entry, order])
+      .sort((left, right) => left[0] - right[0] || left[3] - right[3])
+      .map(([, lx, ly]) => [lx, ly]);
+  };
 
   for (const [index, label] of placed.entries()) {
     const relation = label.relation;
     if (['labelAt', 'labelDx', 'labelDy', 'labelSegment'].some(key => relation[key] !== undefined)) continue;
     // Match actual defect thresholds before searching; a valid placement is
     // not a reason to restyle the diagram. New placements leave extra space.
-    if (inside(label) && !components.some(component => rectsOverlap(label, component, -2))
+    // The grid ranking already starts from the preferred position, so it
+    // also re-ranks labels whose default spot is merely valid.
+    if (!gridSweep && inside(label) && !components.some(component => rectsOverlap(label, component, -2))
         && !titles.some(title => rectsOverlap(label, title))
         && !overlapsLabel(label, index) && !masksRoute(label)) continue;
+    if (gridSweep) {
+      // Callers measure the plate one pixel higher than rectAt; test with a
+      // pixel of slack so the chosen position also passes their clearance.
+      const replacement = gridCandidates(label).map(([lx, ly]) => rectAt(label, lx, ly))
+        .find(rect => clear({ ...rect, x: rect.x - 1, y: rect.y - 1, width: rect.width + 2, height: rect.height + 2 }, index));
+      if (replacement) {
+        placed[index] = replacement;
+        continue;
+      }
+    }
     for (const segment of segments.filter(segment => segment.relationIndex === label.relationIndex)) {
       const [a, b] = [segment.start, segment.end];
       let candidates = [];

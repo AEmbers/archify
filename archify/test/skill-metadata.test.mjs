@@ -51,13 +51,13 @@ test('main skill stays a bounded authoring router with progressive references', 
 });
 
 test('update awareness is notification-only and never replaces the requested workflow', () => {
-  assert.match(skill + updateAwareness, /`scripts\/check-update\.mjs`/);
-  assert.match(skill + updateAwareness, /`silent`[\s\S]*without mentioning/i);
-  assert.match(skill + updateAwareness, /`update_available`[\s\S]*compact notice/i);
+  assert.match(skill + updateAwareness, /`finalize` and standalone `deliver` include `update`/);
+  assert.match(skill + updateAwareness, /`update\.noticeRequired`[\s\S]*final response/i);
+  assert.match(skill + updateAwareness, /several diagrams[\s\S]*once in the final response/i);
   assert.match(skill + updateAwareness, /information, not permission/i);
-  assert.match(skill + updateAwareness, /`severity` is `security`[\s\S]*security update[\s\S]*emphasis only, never user autonomy/i);
-  assert.match(skill + updateAwareness, /continue the user's original task/i);
-  assert.match(skill + updateAwareness, /installed version unchanged/i);
+  assert.match(skill, /Snooze or ignore a reminder only when the user explicitly asks/);
+  assert.match(updateAwareness, /explicitly asks to pause or stop[\s\S]*--snooze "<eventKey>"[\s\S]*--ignore "<eventKey>"[\s\S]*Never run them on your own initiative/);
+  assert.match(skill + updateAwareness, /installed Skill has not changed/i);
   assert.doesNotMatch(skill, /npx skills update|gh skill update/i);
 });
 
