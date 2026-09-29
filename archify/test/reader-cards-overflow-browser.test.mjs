@@ -56,12 +56,27 @@ test('reader cards keep an unbreakable note inside the viewport width', {
       assert.equal(result.exceptionDetails, undefined, result.exceptionDetails?.exception?.description);
       return result.result?.value;
     }
+    // `Page.navigate` resolves when navigation starts, so measuring straight
+    // after it can read the previous document or miss `.cards` entirely. Wait
+    // for the load event, then for the reader's own settle signal.
+    async function load(artifact) {
+      const loaded = browser.cdp.waitFor('Page.loadEventFired', session);
+      loaded.catch(() => {});
+      const navigation = await send('Page.navigate', { url: pathToFileURL(artifact).href });
+      assert.equal(navigation.errorText, undefined, navigation.errorText);
+      await loaded;
+      await evaluate(`(async function () {
+        for (var i = 0; i < 2; i += 1) {
+          await Archify.readerLayout.whenStable();
+          await Archify.viewerChromeLayout.whenStable();
+        }
+      })()`);
+    }
     for (const [cardCount, artifact] of Object.entries(artifacts)) {
       for (const [width, height] of [[1440, 900], [1600, 1000], [1920, 1080]]) {
         await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
-        await send('Page.navigate', { url: pathToFileURL(artifact).href });
-        const measured = await evaluate(`(async function () {
-          for (var i = 0; i < 3; i += 1) await new Promise(function (r) { requestAnimationFrame(function () { setTimeout(r, 120); }); });
+        await load(artifact);
+        const measured = await evaluate(`(function () {
           var rail = document.querySelector('.cards');
           return {
             railScroll: rail.scrollWidth,
