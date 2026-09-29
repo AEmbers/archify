@@ -1,0 +1,10 @@
+{
+  "templateVersion": 1,
+  "repository": "tt-a1i/archify",
+  "number": 637,
+  "author": "tt-a1i",
+  "title": "docs: add Alipay support option with recipient name redacted",
+  "mergedAt": "2026-09-29T16:42:25Z",
+  "mergeCommit": "5ca9c1233b82fac6478158cc1ee2d00c42d3ab1b",
+  "url": "https://github.com/tt-a1i/archify/pull/637"
+}
