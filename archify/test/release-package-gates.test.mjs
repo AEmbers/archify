@@ -11,11 +11,13 @@ import { stageCleanSkill } from '../../scripts/stage-clean-skill.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, '..', '..');
 const canonicalZipNodeMajor = 22;
+const canonicalZipZlibVersion = '1.3.1-e00f703';
 const currentNodeMajor = Number(process.versions.node.split('.')[0]);
+const canonicalZipSkip = currentNodeMajor === canonicalZipNodeMajor && process.versions.zlib === canonicalZipZlibVersion
+  ? false
+  : `canonical ZIP builds require Node ${canonicalZipNodeMajor} with bundled zlib ${canonicalZipZlibVersion}`;
 const canonicalZipTest = (name, fn) => test(name, {
-  skip: currentNodeMajor === canonicalZipNodeMajor
-    ? false
-    : `canonical ZIP builds require Node ${canonicalZipNodeMajor}`,
+  skip: canonicalZipSkip,
 }, fn);
 
 function spawnBuildZip(outputPath, options = {}) {
@@ -80,7 +82,7 @@ function workflowStep(workflow, name) {
 }
 
 function workflowJob(workflow, name) {
-  const marker = `  ${name}:`;
+  const marker = `\n  ${name}:\n`;
   const start = workflow.indexOf(marker);
   assert.notEqual(start, -1, `workflow is missing the "${name}" job`);
   const next = workflow.slice(start + marker.length).search(/\n  [a-z][a-z0-9-]*:\n/);
@@ -213,11 +215,12 @@ test('release docs disclose that mutable Release assets are verified only at dep
   assert.doesNotMatch(design, /即使 Release 资产后来可被替换，也不能脱离/);
 });
 
-test('GitHub Pages deploys docs only after every repository gate succeeds', () => {
+test('GitHub Pages deploys the verified website artifact only after every repository gate succeeds', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
   const job = workflowJob(workflow, 'deploy-pages');
+  assert.match(workflow, /push:\n    branches: \[main, dev\]/);
   assert.match(job, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
-  assert.match(job, /needs: \[test, webm-artifact, zip-freshness, published-update-manifest, package-smoke, windows-test-portability\]/);
+  assert.match(job, /needs: \[test, webm-artifact, zip-freshness, published-update-manifest, package-smoke, windows-test-portability, website\]/);
   assert.match(job, /pages: write/);
   assert.match(job, /id-token: write/);
   assert.match(job, /repos\/\$\{GITHUB_REPOSITORY\}\/git\/ref\/heads\/main/);
@@ -237,13 +240,42 @@ test('GitHub Pages deploys docs only after every repository gate succeeds', () =
     'fc324d3547104276b827a68afc52ff2a11cc49c9',
     'v5.0.0',
   );
-  assert.match(job, /path: docs/);
+  assertPinnedAction(
+    job,
+    'actions/download-artifact',
+    'd3f86a106a0bac45b974a628896c90dbdf5c8093',
+    'v4.3.0',
+  );
+  assert.match(job, /name: website-dist/);
+  assert.match(job, /path: website\/dist/);
   assertPinnedAction(
     job,
     'actions/deploy-pages',
     'cd2ce8fcbc39b97be8ca5fce6e763baed58fa128',
     'v5.0.0',
   );
+  const website = workflowJob(workflow, 'website');
+  assert.match(website, /npm run check && npm run build && npm test/);
+  assert.match(website, /ARCHIFY_SITE_ROOT:.*website\/dist/);
+  assertPinnedAction(
+    website,
+    'actions/upload-artifact',
+    '65462800fd760344b1a7b4382951275a0abb4808',
+    'v4.3.3',
+  );
+  assert.match(website, /name: website-dist/);
+  const browser = workflowJob(workflow, 'webm-artifact');
+  assert.match(browser, /Run shared browser regression gate/);
+  assert.match(browser, /npm run test:browser/);
+  const renderer = workflowJob(workflow, 'test');
+  assert.match(renderer, /Verify community Hermes adapter/);
+  const packageSmoke = workflowJob(workflow, 'package-smoke');
+  assert.match(packageSmoke, /Verify delivery-lock ownership with real subprocesses/);
+  assert.match(packageSmoke, /Verify macOS opener stays behind delivery-lock release/);
+  const windows = workflowJob(workflow, 'windows-test-portability');
+  assert.match(windows, /node-version: \[22, 24\]/);
+  assert.match(windows, /Verify maintained Windows path contracts/);
+  assert.match(windows, /ARCHIFY_REQUIRE_WINDOWS_REAL_PATHS: '1'/);
 });
 
 test('release tags with a SemVer prerelease are marked prerelease and never become latest', () => {
@@ -572,7 +604,8 @@ exec "$ARCHIFY_REAL_NODE" "$@"
     const safeOutput = path.join(safeParent, 'safe.zip');
     const safe = spawnBuildZip(safeOutput, { cwd: fixture, env });
     assert.equal(safe.status, 1, `${safe.stdout}\n${safe.stderr}`);
-    assert.match(safe.stderr, /canonical archify[.]zip builds require Node 22 \(current: 24[.]0[.]0\)/);
+    assert.match(safe.stderr, /canonical archify[.]zip builds require Node 22 with bundled zlib /);
+    assert.match(safe.stderr, /\(current: Node 24[.]0[.]0, zlib [^)]+\)/);
     assert.equal(fs.existsSync(safeOutput), false);
     assert.equal(fs.existsSync(safeParent), false, 'path-only validation must not create output parents');
     assert.deepEqual(fs.readdirSync(fixture).sort(), ['bin']);
@@ -651,6 +684,8 @@ canonicalZipTest('built archives contain the embedded notifier runtime', () => {
     const entries = new Set(listing.stdout.trim().split('\n'));
     assert.ok(entries.has('archify/skill-release.json'));
     assert.ok(entries.has('archify/scripts/check-update.mjs'));
+    assert.ok(entries.has('archify/scripts/delivery-update-child.mjs'));
+    assert.ok(entries.has('archify/bin/delivery-update.mjs'));
     assert.ok(entries.has('archify/scripts/update-contract.mjs'));
     assert.ok(entries.has('archify/renderers/shared/atomic-output.mjs'));
     assert.ok(entries.has('archify/renderers/shared/sidecar-path.mjs'));
@@ -768,10 +803,31 @@ canonicalZipTest('archive build rejects an unmerged index and preserves an exist
   }
 });
 
-test('archive build rejects non-canonical Node versions before publishing output', {
-  skip: currentNodeMajor === canonicalZipNodeMajor
-    ? `requires a Node major other than ${canonicalZipNodeMajor}`
-    : false,
+test('archive build rejects incompatible zlib before publishing output', {
+  skip: currentNodeMajor !== canonicalZipNodeMajor ? 'requires Node 22 to isolate the zlib gate' : false,
+}, () => {
+  const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-package-zlib-'));
+  try {
+    const archive = path.join(outputRoot, 'archify.zip');
+    const trusted = Buffer.from('existing canonical archive');
+    const preload = path.join(outputRoot, 'noncanonical-zlib.cjs');
+    fs.writeFileSync(preload, "Object.defineProperty(process.versions, 'zlib', { value: '0.0.0-test' });\n");
+    fs.writeFileSync(archive, trusted);
+    const build = spawnBuildZip(archive, {
+      env: { ...process.env, NODE_OPTIONS: `--require ${JSON.stringify(preload)}` },
+    });
+    assert.notEqual(build.status, 0, `${build.stdout}\n${build.stderr}`);
+    assert.match(build.stderr, /canonical archify\.zip builds require Node 22 with bundled zlib/);
+    assert.match(build.stderr, /0\.0\.0-test/);
+    assert.ok(fs.readFileSync(archive).equals(trusted), 'toolchain rejection must preserve the canonical archive');
+    assert.deepEqual(fs.readdirSync(outputRoot).sort(), ['archify.zip', 'noncanonical-zlib.cjs']);
+  } finally {
+    fs.rmSync(outputRoot, { recursive: true, force: true });
+  }
+});
+
+test('archive build rejects non-canonical Node/zlib toolchains before publishing output', {
+  skip: canonicalZipSkip ? false : 'requires a non-canonical Node/zlib toolchain',
 }, () => {
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-package-node-version-'));
   try {
@@ -824,9 +880,7 @@ canonicalZipTest('archive build is byte-for-byte reproducible across caller time
 test('archive build accepts Windows-style absolute output paths', {
   skip: process.platform !== 'win32'
     ? 'Windows drive paths only reach build-zip.sh on win32'
-    : currentNodeMajor === canonicalZipNodeMajor
-      ? false
-      : `canonical ZIP builds require Node ${canonicalZipNodeMajor}`,
+    : canonicalZipSkip,
 }, () => {
   const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-package-windows-path-'));
   const backslashArchive = path.win32.join(outputRoot, 'backslash.zip');
@@ -1502,6 +1556,7 @@ test('CI and tagged releases share the maintained Windows path contract on Node 
     'test/open-artifact.test.mjs',
     'test/repository-evidence.test.mjs',
     'test/renderer-atomic-write.test.mjs',
+    'test/atomic-output-recovery.test.mjs',
   ];
   for (const suite of fullSuites) {
     assert.ok(runner.includes(`'${suite}'`), `shared runner must execute ${suite}`);
@@ -1634,14 +1689,18 @@ test('CI and tagged releases share the maintained Windows path contract on Node 
     assert.match(job, /node-version:\s*\$\{\{ matrix\.node-version \}\}/);
     assert.match(job, /npm ci --ignore-scripts/);
     assert.match(job, /node scripts\/run-windows-path-tests\.mjs/);
-    assert.match(job, /name: Provision controlled Windows path fixtures\n\s+shell: pwsh/);
+    assert.match(job, label === 'CI'
+      ? /name: Provision controlled Windows path fixtures\n\s+if: needs\.scope\.outputs\.scope == 'full'\n\s+shell: pwsh/
+      : /name: Provision controlled Windows path fixtures\n\s+shell: pwsh/);
     assert.match(
       job,
       /scripts\/windows-path-fixtures[.]ps1 -NodeVersion '\$\{\{ matrix[.]node-version \}\}'/,
     );
     assert.match(
       job,
-      /name: Clean up controlled Windows path fixtures\n\s+if: \$\{\{ always\(\) \}\}/,
+      label === 'CI'
+        ? /name: Clean up controlled Windows path fixtures\n\s+if: \$\{\{ always\(\) && needs\.scope\.outputs\.scope == 'full' \}\}/
+        : /name: Clean up controlled Windows path fixtures\n\s+if: \$\{\{ always\(\) \}\}/,
     );
     assert.match(
       job,

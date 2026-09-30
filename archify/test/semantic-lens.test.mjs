@@ -67,17 +67,16 @@ test('Semantic Lens is shareable and yields cleanly to stronger reader intent', 
   assert.match(html, /eventPath\.indexOf\(panel\) >= 0/);
   assert.match(html, /Archify\.semanticLens\.clear\(\{ updateUrl: false/);
   assert.match(html, /Archify\.focus\.clear\(\{ updateUrl: false, preserveView: true \}\)/);
-  assert.match(html, /Archify\.routeProbe\.clear\(\{ updateUrl: false, preserveView: true, restoreFocus: false \}\)/);
-  assert.match(html, /Archify\.guidedViews\.showAll\(\{ clearFocus: false, updateUrl: false, resetView: false \}\)/);
+  assert.match(html, /Archify\.routeProbe\.clear\(\{ updateUrl: false, restoreFocus: false \}\)/);
   assert.match(html, /if \(action === 'lens'\) return Archify\.semanticLens\.open\(\)/);
   assert.match(html, /e\.key === 'l' \|\| e\.key === 'L'/);
   assert.match(html, /e\.key === 'Escape' && Archify\.semanticLens\.isOpen\(\)/);
   assert.match(html, /e\.key === 'Escape' && Archify\.semanticLens\.active\(\)/);
 });
 
-test('Semantic Lens preserves full text, mobile containment, print, embed, and export boundaries', () => {
+test('Semantic Lens reveals exact detail, mobile containment, print, embed, and export boundaries', () => {
   const html = render('dataflow', CASES.dataflow);
-  assert.doesNotMatch(html, /\[data-detail-level="(?:map|read)"\][^{]*\[data-detail/);
+  assert.match(html, /svg\[data-lens-active\] \[data-lens-match\] \[data-detail\]/);
   assert.match(canonicalSvg(html), /data-detail="context"/);
   assert.match(html, /html\[data-embed="true"\] \.semantic-lens/);
   assert.match(html, /data-wide-diagram="true"\] \.semantic-lens/);

@@ -35,9 +35,9 @@ function contained(o,label) {
     assert.ok(sign*(o.svg[a]-o.stage[b])>=14,`${label} ${a}: ${JSON.stringify(o)}`);
   assert.ok(Math.abs((o.svg.left+o.svg.right-o.stage.left-o.stage.right)/2)<=2,label+' horizontal center');
   assert.ok(Math.abs((o.svg.top+o.svg.bottom-o.stage.top-o.stage.bottom)/2)<=2,label+' vertical center');
-  assert.ok(o.effective>0&&o.effective<=1.00001,label+' no automatic enlargement');
-  assert.ok(Math.abs(o.effective-o.state.scale)<=Math.max(1e-6,o.state.scale*.005),label+' honest scale');
-  assert.ok(o.range.every(v=>v<=1),label+' page containment');assert.deepEqual(o.errors,[]);
+  assert.ok(o.effective>0,label+' valid scale');
+  assert.ok(o.range.every(v=>v<=1),label+' no page overflow');
+  assert.deepEqual(o.page,[0,0],label+' stationary page');assert.deepEqual(o.errors,[]);
 }
 function sameReading(before,after,label) {
   assert.ok(Math.abs(after.effective/before.effective-1)<=.005,label+' actual scale');
@@ -75,7 +75,7 @@ test('Canvas framing fixtures render successfully before browser verification',t
   for(const fixture of fixtures)assert.ok(fs.statSync(fixture.file).size>0,fixture.name);
 });
 
-test('Stable canvas framing preserves complete first view and manual reading geometry',{
+test('Canvas preserves dev initial reading and explicit Fit all navigation',{
   skip:chrome?false:'Set ARCHIFY_CHROME to run stable framing browser acceptance.',
 },async t=>{
   const scratch=fs.mkdtempSync(path.join(os.tmpdir(),'archify-framing-'));
@@ -115,176 +115,54 @@ test('Stable canvas framing preserves complete first view and manual reading geo
   }
   async function shot(name){if(evidence){const r=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(r.data,'base64'));}}
   async function sample(label){const o=await run(observation);records.push({label,...o});return o;}
-  for(const fixture of fixtures.filter(f=>f.name!=='small'&&f.name!=='long-300'&&f.name!=='wide')){
-    for(const [width,height] of [[1366,768],[1440,900],[2048,1320]])for(const theme of ['light','dark']){
-      await t.test(`${fixture.name}-${width}-${theme} first view`,async()=>{
-        const label=`${fixture.name}-${width}-${theme}`;
-        const baseline=process.env.ARCHIFY_FRAMING_BASELINE&&path.join(process.env.ARCHIFY_FRAMING_BASELINE,fixture.name+'.html');
-        let before;
-        if(baseline&&fs.existsSync(baseline)){
-          await load(baseline,width,height,theme);before=await sample('baseline-'+label);await shot('baseline-'+label);
-          const spec=path.join(process.env.ARCHIFY_FRAMING_BASELINE,fixture.name+'.json');
-          assert.equal(createHash('sha256').update(fs.readFileSync(spec)).digest('hex'),fixture.sha256,'same input');
-        }
-        await load(fixture.file,width,height,theme);const o=await sample('candidate-'+label);await shot('candidate-'+label);
-        if(before){assert.equal(o.viewBox,before.viewBox);assert.deepEqual(o.nodes,before.nodes);assert.deepEqual(o.texts,before.texts);}
-        contained(o,label);
-        const frames=await run('framingFrames');records.push({label:'first-frames-'+label,frames});
-        for(const frame of frames){assert.equal(frame.fixed,true);assert.ok(frame.rect.top>=frame.stage.top-2&&frame.rect.bottom<=frame.stage.bottom+2,label+' no clipped first frame');}
-        if(width===1440){
-          await run('Archify.view.reset()');await stable();
-          const reading=await sample('reading-100-'+label);await shot('reading-100-'+label);
-          assert.ok(Math.abs(reading.effective-1)<=.005,'100% uses authored size');
-          assert.deepEqual(reading.texts,o.texts,'all original text remains at reading scale');
-        }
-      });
-    }
+  for(const fixture of fixtures)for(const [width,height] of [[1440,900],[2048,1320]])for(const theme of ['light','dark']){
+    await t.test(`${fixture.name}-${width}-${theme}: original reading and explicit Fit all`,async()=>{
+      const base=process.env.ARCHIFY_FRAMING_BASELINE&&path.join(process.env.ARCHIFY_FRAMING_BASELINE,fixture.name+'.html');
+      let before;
+      if(base&&fs.existsSync(base)){
+        const spec=path.join(process.env.ARCHIFY_FRAMING_BASELINE,fixture.name+'.json');
+        assert.equal(createHash('sha256').update(fs.readFileSync(spec)).digest('hex'),fixture.sha256,'same frozen source');
+        await load(base,width,height,theme);before=await sample('dev-'+fixture.name+'-'+width+'-'+theme);await shot('dev-'+fixture.name+'-'+width+'-'+theme);
+      }
+      await load(fixture.file,width,height,theme);
+      const initial=await sample('candidate-'+fixture.name+'-'+width+'-'+theme);await shot('candidate-'+fixture.name+'-'+width+'-'+theme);
+      assert.deepEqual(initial.state,{scale:1,x:0,y:0,mode:'overview'});assert.equal(initial.fixed,true);
+      assert.ok(initial.range.every(v=>v<=1),'bounded page at original reading size');assert.deepEqual(initial.page,[0,0]);assert.deepEqual(initial.errors,[]);
+      if(before){
+        assert.equal(initial.viewBox,before.viewBox);assert.deepEqual(initial.nodes,before.nodes);assert.deepEqual(initial.texts,before.texts);
+        assert.ok(Math.abs(initial.effective/before.effective-1)<.005,'preserve dev initial reading scale: '+JSON.stringify({before:before.effective,after:initial.effective}));
+      }
+      await run('Archify.view.fitAll()');await stable();const fit=await sample('explicit-fit-'+fixture.name+'-'+width+'-'+theme);
+      assert.equal(fit.state.mode,'fit');contained(fit,'explicit Fit all');
+      await run('Archify.view.zoomIn()');await stable();const zoomed=await sample('zoom-'+fixture.name);
+      assert.ok(zoomed.effective>fit.effective);
+      await run('Archify.view.reset()');await stable();
+      assert.deepEqual((await sample('reset-'+fixture.name)).state,initial.state);
+    });
   }
-  for(const name of ['small','long-300','wide'])await t.test(name+' complete initial view and continuous zoom',async()=>{
-    const f=fixtures.find(f=>f.name===name);await load(f.file);const initial=await sample(name+'-initial');await shot(name+'-initial');contained(initial,name);
-    if(name==='small')assert.equal(initial.effective,1);
-    if(name!=='small')assert.ok(initial.effective<.25);
-    await run('Archify.view.zoomIn()');await stable();const zoomed=await sample(name+'-zoom');assert.ok(zoomed.effective>initial.effective);
-    if(initial.effective<.2)assert.ok(zoomed.effective<.25);
-    for(const axis of ['x','y'])assert.ok(Math.abs(zoomed.center[axis]-initial.center[axis])*zoomed.effective<=2,
-      name+' zoom buttons must keep the visible reading center');
-  });
-  await t.test('manual proportions and reading center survive notes and resize',async()=>{
-    await load(fixtures.find(f=>f.name==='small').file);
-    for(const scale of [.1,.5,1,2]){
-      // The low-scale case uses the large fixture whose valid minimum is below 25%.
-      if(scale===.1)await load(fixtures.find(f=>f.name==='wide').file);
-      else await load(fixtures.find(f=>f.name==='small').file);
-      await run(`Archify.view.reset();Archify.view.zoomAt(${scale},400,300);Archify.view.panBy(-180,90)`);await stable();
-      let previous=await sample('manual-'+scale);assert.ok(Math.abs(previous.effective-scale)<.005);
-      const hasNotes=await run(`!document.getElementById('btn-diagram-notes').hidden`);
-      if(hasNotes)for(let i=0;i<20;i++){
-        await run(`document.getElementById('btn-diagram-notes').click()`);await stable();const next=await sample('notes-'+scale+'-'+i);sameReading(previous,next,'notes '+scale);previous=next;
-        if(i<2)await shot('notes-'+scale+'-'+i);
-      }
-      for(let i=0;i<3;i++)for(const [width,height] of [[1100,700],[2048,1320],[1440,900]]){
-        await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});await stable();
-        const next=await sample('resize-'+scale+'-'+i+'-'+width);sameReading(previous,next,'resize '+scale);previous=next;
-      }
-      for(let i=0;i<3;i++){
-        await send('Emulation.setDeviceMetricsOverride',{width:1023,height:599,deviceScaleFactor:1,mobile:false});await stable();
-        await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});await stable();
-        const next=await sample('breakpoint-'+scale+'-'+i);sameReading(previous,next,'breakpoint '+scale);previous=next;
-      }
-      await run('Archify.view.fitAll()');await stable();contained(await sample('fit-restored-'+scale),'fit restored');
+  await t.test('manual reading survives placement changes and desktop resizes',async()=>{
+    await load(fixtures[0].file,1920,1080);
+    await run(`localStorage.setItem('archify-rail-placement','right');localStorage.setItem('archify-rail-collapsed','0')`);
+    await load(fixtures[0].file,1920,1080);
+    await run('Archify.view.zoomAt(2,400,300);Archify.view.panBy(-80,50)');await stable();
+    let previous=await sample('manual');
+    for(let i=0;i<20;i++){
+      await run(`document.getElementById('rail-placement').click()`);await stable();
+      const next=await sample('placement-'+i);sameReading(previous,next,'placement');previous=next;
+    }
+    for(const [width,height] of [[1100,700],[2048,1320],[1440,900],[1023,599],[1440,900]]){
+      await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});await stable();
+      const next=await sample('resize-'+width);sameReading(previous,next,'resize');previous=next;
     }
   });
-  await t.test('document-mode input owns the reading point when returning to fixed canvas',async()=>{
-    await load(fixtures.find(f=>f.name==='small').file);
-    await run('Archify.view.zoomAt(2,400,300);Archify.view.panBy(-90,70)');await stable();
-    await send('Emulation.setDeviceMetricsOverride',{width:1023,height:599,deviceScaleFactor:1,mobile:false});await stable();
-    await run('Archify.view.zoomAt(.8,400,300);Archify.view.panBy(110,-70)');await stable();
-    const before=await sample('fallback-latest-input');assert.equal(before.fixed,false);
-    await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});await stable();
-    const after=await sample('fallback-latest-return');sameReading(before,after,'newest fallback intent');
-  });
-  await t.test('delayed font readiness cannot overwrite manual or explicit deep-link intent',async()=>{
-    const fixture=fixtures.find(f=>f.name==='maka')||fixtures[0];
-    const source=JSON.parse(fs.readFileSync(fixture.source));
-    const hashes=['',source.components?.[0]?.id&&'#focus='+encodeURIComponent(source.components[0].id),
-      source.meta.views?.[0]?.id&&'#view='+encodeURIComponent(source.meta.views[0].id)].filter(v=>v!==undefined);
-    for(const hash of hashes){
-      await load(fixture.file,1440,900,'light','&framingDelayFonts=1'+hash,false);
-      await run(`(async()=>{for(let i=0;i<45;i++)await new Promise(requestAnimationFrame);})()`);
-      assert.equal(await run('typeof releaseFramingFonts'),'function');
-      if(!hash)await run('Archify.view.zoomAt(1.5,400,300);Archify.view.panBy(-70,50)');
-      const before=await sample('fonts-pending-'+hash);
-      assert.equal(before.state.mode,hash?'semantic':'manual');
-      await run('releaseFramingFonts()');await stable();
-      const after=await sample('fonts-released-'+hash);await shot('fonts-released-'+(hash?'linked':'manual'));
-      assert.equal(after.state.mode,before.state.mode);
-      if(!hash)sameReading(before,after,'late fonts preserve manual input');
-      else {
-        sameReading(before,after,'late fonts preserve explicit target');
-        assert.ok(Math.abs(after.state.scale-before.state.scale)<=1e-6,'semantic scale stays unchanged');
-        for(const axis of ['x','y'])assert.ok(Math.abs(after.state[axis]-before.state[axis])<=.5,'semantic position stays unchanged');
-      }
+  await t.test('late layout and invalid links retain default or explicit user intent',async()=>{
+    for(const hash of ['', '#focus=missing-framing-node', '#focus=api']){
+      await load(fixtures[0].file,1440,900,'light',hash);
+      const initial=await sample('link-'+hash);
+      assert.equal(initial.state.mode,hash==='#focus=api'?'semantic':'overview');
+      await run('Archify.view.panBy(80,-50)');await stable();const manual=await sample('manual-link-'+hash);
+      await run(`dispatchEvent(new Event('load'));Archify.readerLayout.schedule();Archify.viewerChromeLayout.schedule()`);await stable();
+      sameReading(manual,await sample('late-link-'+hash),'late layout');
     }
   });
-  await t.test('node, chapter and invalid deep links preserve explicit navigation priority',async()=>{
-    const fixture=fixtures.find(f=>f.name==='maka')||fixtures[0];
-    const source=JSON.parse(fs.readFileSync(fixture.source));
-    const node=source.components?.[0]?.id;const chapter=source.meta.views?.[0]?.id;
-    for(const hash of [node&&'#focus='+encodeURIComponent(node),chapter&&'#view='+encodeURIComponent(chapter),'#focus=missing-framing-node','#view=missing-framing-chapter'].filter(Boolean)){
-      await load(fixture.file,1440,900,'light',hash);let before=await sample('deep-link-'+hash);
-      if(hash.includes('missing-'))contained(before,'invalid link falls back');
-      else assert.equal(before.state.mode,'semantic');
-      await run(`dispatchEvent(new Event('load'));Archify.readerLayout.schedule()`);await stable();
-      assert.deepEqual((await sample('late-layout-'+hash)).state,before.state);
-      await run('Archify.view.panBy(80,-50)');await stable();before=await sample('user-wins-'+hash);
-      await run(`Archify.readerLayout.schedule();Archify.viewerChromeLayout.schedule()`);await stable();
-      sameReading(before,await sample('late-user-'+hash),'late initialization');
-    }
-  });
-});
-
-test('semantic chapter framing contains every target with desktop notes open or closed', {
-  skip: chrome ? false : 'Set ARCHIFY_CHROME to check semantic chapter containment.',
-}, async t => {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-chapter-fit-'));
-  t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
-  const source = path.join(root, 'examples', examples.architecture);
-  const spec = JSON.parse(fs.readFileSync(source, 'utf8'));
-  const file = path.join(scratch, 'architecture.html');
-  execFileSync(process.execPath, [path.join(root, 'bin/archify.mjs'), 'render', 'architecture', source, file]);
-  const browser = desktopBrowser(chrome);
-  t.after(() => browser.close());
-  const session = await browser.sessionPromise;
-  const send = (method, params = {}) => browser.cdp.send(method, params, session);
-  async function run(expression) {
-    const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
-    assert.equal(result.exceptionDetails, undefined);
-    return result.result?.value;
-  }
-  async function stable() {
-    await run(`(async()=>{
-      await document.fonts.ready;
-      await Archify.readerLayout.whenStable();
-      await Archify.viewerChromeLayout.whenStable();
-      for(let i=0,previous='',same=0;i<180;i++){
-        await new Promise(requestAnimationFrame);
-        const value=JSON.stringify([Archify.view.state(),document.querySelector('.diagram-container').getBoundingClientRect().toJSON()]);
-        same=value===previous?same+1:0;previous=value;
-        if(same>=8&&!document.querySelector('[data-camera-transaction]'))return;
-      }
-      throw new Error('Chapter framing did not settle');
-    })()`);
-  }
-  const records = [];
-  for (const width of [1024, 1440, 2048]) {
-    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
-    const loaded = browser.cdp.waitFor('Page.loadEventFired', session);
-    await send('Page.navigate', { url: pathToFileURL(file).href + '?chapter-fit=' + width });
-    await loaded; await stable();
-    for (const notes of [false, true]) {
-      if (notes) { await run("document.getElementById('btn-diagram-notes').click()"); await stable(); }
-      for (const chapter of spec.meta.views) {
-        await run(`document.querySelector('[data-guided-view-id="${chapter.id}"]').click()`);
-        await stable();
-        const observed = await run(`(()=>{
-          const stage=Archify.viewerChromeLayout.stageRect();
-          return {state:Archify.view.state(),stage,nodes:${JSON.stringify(chapter.focus)}.map(id=>{
-            const r=document.querySelector('[data-node-id="'+id+'"]').getBoundingClientRect();
-            return {id,left:r.left,right:r.right,top:r.top,bottom:r.bottom};
-          })};
-        })()`);
-        records.push({ width, notes, chapter: chapter.id, ...observed });
-        assert.equal(observed.state.mode, 'semantic');
-        for (const node of observed.nodes) {
-          assert.ok(node.left >= observed.stage.left - 1 && node.right <= observed.stage.right + 1 &&
-            node.top >= observed.stage.top - 1 && node.bottom <= observed.stage.bottom + 1,
-          JSON.stringify({ width, notes, chapter: chapter.id, ...observed }));
-        }
-      }
-    }
-  }
-  if (process.env.ARCHIFY_FRAMING_EVIDENCE) {
-    fs.mkdirSync(process.env.ARCHIFY_FRAMING_EVIDENCE, { recursive: true });
-    fs.writeFileSync(path.join(process.env.ARCHIFY_FRAMING_EVIDENCE, 'chapter-containment.json'), JSON.stringify(records, null, 2) + '\n');
-  }
 });

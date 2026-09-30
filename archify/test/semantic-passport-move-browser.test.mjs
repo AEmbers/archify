@@ -250,8 +250,10 @@ test('Semantic Passport pointer movement honors threshold, capture, four-edge cl
     }))`);
     await browser.cdp.send('Input.dispatchMouseEvent', {
       type: 'mouseReleased',
-      x: cancelStart.x + 70,
-      y: cancelStart.y + 50,
+      // After cancellation the handle no longer owns the pointer. Releasing
+      // over page background must not turn the cancelled drag into dismissal.
+      x: 5,
+      y: 5,
       button: 'left',
       buttons: 0,
       clickCount: 1,
@@ -327,6 +329,14 @@ test('Semantic Passport pointer movement honors threshold, capture, four-edge cl
     const reopened = await focusNode(browser, sessionId, 'lb');
     assert.equal(reopened.manual, null, JSON.stringify(reopened, null, 2));
     assert.equal(reopened.styleLeft, '', JSON.stringify(reopened, null, 2));
+    await browser.cdp.send('Input.dispatchMouseEvent', {
+      type: 'mousePressed', x: 5, y: 5, button: 'left', buttons: 1, clickCount: 1,
+    }, sessionId);
+    await browser.cdp.send('Input.dispatchMouseEvent', {
+      type: 'mouseReleased', x: 5, y: 5, button: 'left', buttons: 0, clickCount: 1,
+    }, sessionId);
+    await settle(browser, sessionId, 20);
+    assert.equal((await passportState(browser, sessionId)).hidden, true, 'a subsequent deliberate outside click must still dismiss');
   } finally {
     await browser.close();
   }
@@ -420,7 +430,22 @@ test('mobile scrolling and wide coarse pointers keep automatic placement and hid
       container.scrollLeft = container.scrollWidth - container.clientWidth;
       container.dispatchEvent(new Event('scroll'));
     })()`);
-    await settle(browser, sessionId, 80);
+    // scrollLeft starts CSS smooth scrolling. Observe its destination rather
+    // than a platform-dependent intermediate compositor frame after 80ms.
+    await evaluate(browser, sessionId, `new Promise((resolve, reject) => {
+      const container = document.querySelector('.diagram-container');
+      const deadline = performance.now() + 3000;
+      let stable = 0;
+      function sample() {
+        const target = container.scrollWidth - container.clientWidth;
+        const pinned = parseFloat(container.style.getPropertyValue('--archify-scroll-x')) || 0;
+        stable = Math.abs(container.scrollLeft - target) <= 1 && Math.abs(pinned - container.scrollLeft) <= 1 ? stable + 1 : 0;
+        if (stable >= 3) return resolve();
+        if (performance.now() > deadline) return reject(new Error('mobile scroll and control pinning did not settle'));
+        requestAnimationFrame(sample);
+      }
+      requestAnimationFrame(sample);
+    })`, true);
     const scrolled = await passportState(browser, sessionId);
     assert.equal(scrolled.handleDisplay, 'none', JSON.stringify(scrolled, null, 2));
     assert.equal(scrolled.manual, null, JSON.stringify(scrolled, null, 2));

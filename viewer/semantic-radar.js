@@ -395,8 +395,7 @@
         reflectVisible();
         syncViewport();
         nodes.forEach(function (item) {
-          var active = item.node.hasAttribute('data-focus-selected') ||
-            item.node.getAttribute('data-story-beat-state') === 'active';
+          var active = item.node.hasAttribute('data-focus-selected');
           if (active) item.rect.setAttribute('data-radar-active', 'true');
           else item.rect.removeAttribute('data-radar-active');
         });
@@ -413,16 +412,14 @@
         options = options || {};
         next = Boolean(next);
         if (next && Archify.semanticLens && typeof Archify.semanticLens.clearPreview === 'function') Archify.semanticLens.clearPreview();
-        if (next && Archify.semanticLens && (Archify.semanticLens.active() || Archify.semanticLens.isOpen())) {
-          Archify.semanticLens.clear({ updateUrl: !!Archify.semanticLens.active(), preserveView: true, closePanel: true });
-        }
-        if (next && Archify.routeProbe && Archify.routeProbe.active()) {
-          Archify.routeProbe.clear({ preserveView: true, restoreFocus: false });
+        if (next && Archify.semanticLens && Archify.semanticLens.isOpen()) {
+          Archify.semanticLens.close({ restoreFocus: false });
         }
         requestedOpen = next;
         if (next) {
           clearSpaceRetry();
           spaceRetryCount = 0;
+          trigger.setAttribute('data-radar-requested', 'true');
           build();
           attemptRequestedOpen(options);
         } else {
@@ -437,17 +434,20 @@
           resetDockingStyles();
           restorePassport();
           feedback.hidden = true;
+          // Focus before collapsing: the dock hides this trigger at 100% unless it holds focus.
+          if (options.restoreFocus === true) trigger.focus();
           trigger.setAttribute('aria-expanded', 'false');
+          trigger.removeAttribute('data-radar-requested');
           trigger.removeAttribute('data-radar-space-limited');
           trigger.setAttribute('aria-label', viewerText('viewer.nav.radar'));
           trigger.title = viewerText('viewer.nav.radar.title');
-          if (options.restoreFocus === true) trigger.focus();
         }
         return next;
       }
       function toggle() { return setOpen(!requestedOpen, { focus: false }); }
       function close(options) { return setOpen(false, options); }
       function bringNodeIntoWindow(node) {
+        if (document.documentElement.hasAttribute('data-fixed-canvas')) return;
         var delay = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 540;
         window.setTimeout(function () {
           var rect = node.getBoundingClientRect();
@@ -462,9 +462,6 @@
       function focusNode(id) {
         var main = diagram.querySelector('[data-node-id="' + id + '"]');
         if (!main) return false;
-        if (Archify.guidedViews && typeof Archify.guidedViews.showAll === 'function') {
-          Archify.guidedViews.showAll({ clearFocus: false, updateUrl: false });
-        }
         if (Archify.focus && typeof Archify.focus.set === 'function') {
           Archify.focus.set(id, { toggle: false });
         }
@@ -487,7 +484,7 @@
       function navigate(event) {
         var point = diagramPoint(event);
         if (!point || !Archify.view || typeof Archify.view.centerAt !== 'function') return;
-        Archify.view.centerAt(point.x, point.y, { preserveScale: true, instant: true,
+        Archify.view.centerAt(point.x, point.y, { minimumScale: 1.5, instant: true,
           defer: true, manual: !viewportDrag });
       }
       function endViewportDrag(event, cancelOnly) {

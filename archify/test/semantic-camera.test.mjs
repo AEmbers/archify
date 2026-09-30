@@ -45,7 +45,7 @@ test('all typed renderers ship the same geometry-neutral semantic camera', () =>
     assert.match(html, /visibleBottom - visibleTop >= 240/, mode);
     assert.match(html, /data-camera-mode/, mode);
     assert.match(html, /data-camera-indicator/, mode);
-    assert.match(html, /var resolvedLevel = semantic \? viewerText\('viewer\.nav\.level\.auto'\) : ''/, mode);
+    assert.match(html, /var resolvedLevel = semantic \? viewerText\('viewer\.nav\.level\.auto'\) : levelLabel/, mode);
     assert.match(html, /is-camera-moving/, mode);
     assert.match(html, /cubic-bezier\(0\.22, 1, 0\.36, 1\)/, mode);
     assert.doesNotMatch(svg(html), /data-camera-mode|is-camera-moving|AUTO /, mode);
@@ -54,12 +54,10 @@ test('all typed renderers ship the same geometry-neutral semantic camera', () =>
 
 test('semantic camera follows reader intent but yields to manual navigation', () => {
   const html = render('workflow', CASES.workflow);
-  assert.match(html, /beginHandoff\(previousIndex, index, previous, view, outgoingBeatIndex, options\.playback === true \? 'playback' : 'guided'\)/);
   assert.match(html, /reveal\(\[id\], \{ includeNeighbors: true, reason: 'focus' \}\)/);
   assert.match(html, /reveal\(\[id\], \{ includeNeighbors: true, reason: 'relationship' \}\)/);
   assert.match(html, /reveal\(\[id\], \{ includeNeighbors: true, reason: 'finder' \}\)/);
   assert.match(html, /function interruptCamera\(reason\)/);
-  assert.match(html, /Archify\.guidedViews\.pause\(\)/);
   assert.match(html, /container\.addEventListener\('pointerdown',[\s\S]+interruptCamera\(\)/);
   assert.match(html, /\.overview-map, \.route-probe, \.semantic-lens/);
   assert.match(html, /window\.innerWidth <= 720 && container\.hasAttribute\('data-wide-diagram'\) && Date\.now\(\) > autoScrollUntil/);

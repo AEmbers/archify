@@ -546,6 +546,7 @@ const fullSuites = [
   'test/open-artifact.test.mjs',
   'test/repository-evidence.test.mjs',
   'test/renderer-atomic-write.test.mjs',
+  'test/atomic-output-recovery.test.mjs',
 ];
 
 const portabilitySuites = [

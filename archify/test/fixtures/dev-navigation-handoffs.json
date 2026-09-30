@@ -1,0 +1,294 @@
+{
+  "route-to-map": {
+    "modes": {
+      "route": true,
+      "map": true,
+      "lens": false
+    },
+    "buttons": {
+      "route": true,
+      "map": true,
+      "lens": false
+    },
+    "panels": {
+      "route": true,
+      "map": true,
+      "lens": false
+    },
+    "lens": null,
+    "route": "source",
+    "hash": "",
+    "playing": false,
+    "routePaint": false,
+    "lensPaint": false,
+    "cameraMode": "manual"
+  },
+  "route-to-lens": {
+    "modes": {
+      "route": true,
+      "map": false,
+      "lens": true
+    },
+    "buttons": {
+      "route": true,
+      "map": false,
+      "lens": true
+    },
+    "panels": {
+      "route": true,
+      "map": false,
+      "lens": true
+    },
+    "lens": null,
+    "route": "source",
+    "hash": "",
+    "playing": false,
+    "routePaint": false,
+    "lensPaint": false,
+    "cameraMode": "manual"
+  },
+  "map-to-route": {
+    "modes": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "buttons": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "panels": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "lens": null,
+    "route": "source",
+    "hash": "",
+    "playing": false,
+    "routePaint": false,
+    "lensPaint": false,
+    "cameraMode": "manual"
+  },
+  "map-to-lens": {
+    "modes": {
+      "route": false,
+      "map": false,
+      "lens": true
+    },
+    "buttons": {
+      "route": false,
+      "map": false,
+      "lens": true
+    },
+    "panels": {
+      "route": false,
+      "map": false,
+      "lens": true
+    },
+    "lens": null,
+    "route": null,
+    "hash": "",
+    "playing": false,
+    "routePaint": false,
+    "lensPaint": false,
+    "cameraMode": "manual"
+  },
+  "lens-to-route": {
+    "modes": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "buttons": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "panels": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "lens": null,
+    "route": "source",
+    "hash": "",
+    "playing": false,
+    "routePaint": false,
+    "lensPaint": false,
+    "cameraMode": "manual"
+  },
+  "lens-to-map": {
+    "modes": {
+      "route": false,
+      "map": true,
+      "lens": false
+    },
+    "buttons": {
+      "route": false,
+      "map": true,
+      "lens": false
+    },
+    "panels": {
+      "route": false,
+      "map": true,
+      "lens": false
+    },
+    "lens": null,
+    "route": null,
+    "hash": "",
+    "playing": false,
+    "routePaint": false,
+    "lensPaint": false,
+    "cameraMode": "manual"
+  },
+  "active-lens-to-route": {
+    "modes": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "buttons": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "panels": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "lens": null,
+    "route": "source",
+    "hash": "#lens=database",
+    "playing": false,
+    "routePaint": false,
+    "lensPaint": false,
+    "cameraMode": "manual"
+  },
+  "active-lens-to-map": {
+    "modes": {
+      "route": false,
+      "map": true,
+      "lens": true
+    },
+    "buttons": {
+      "route": false,
+      "map": true,
+      "lens": true
+    },
+    "panels": {
+      "route": false,
+      "map": true,
+      "lens": false
+    },
+    "lens": [
+      "database"
+    ],
+    "route": null,
+    "hash": "#lens=database",
+    "playing": false,
+    "routePaint": false,
+    "lensPaint": true,
+    "cameraMode": "manual"
+  },
+  "path-to-map": {
+    "modes": {
+      "route": true,
+      "map": true,
+      "lens": false
+    },
+    "buttons": {
+      "route": true,
+      "map": true,
+      "lens": false
+    },
+    "panels": {
+      "route": true,
+      "map": true,
+      "lens": false
+    },
+    "lens": null,
+    "route": "result",
+    "hash": "#route=users~db",
+    "playing": false,
+    "routePaint": true,
+    "lensPaint": false,
+    "cameraMode": "semantic"
+  },
+  "path-to-lens": {
+    "modes": {
+      "route": true,
+      "map": false,
+      "lens": true
+    },
+    "buttons": {
+      "route": true,
+      "map": false,
+      "lens": true
+    },
+    "panels": {
+      "route": true,
+      "map": false,
+      "lens": true
+    },
+    "lens": null,
+    "route": "result",
+    "hash": "#route=users~db",
+    "playing": false,
+    "routePaint": true,
+    "lensPaint": false,
+    "cameraMode": "semantic"
+  },
+  "route-deep-link": {
+    "modes": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "buttons": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "panels": {
+      "route": true,
+      "map": false,
+      "lens": false
+    },
+    "lens": null,
+    "route": "result",
+    "hash": "#route=users~db",
+    "playing": false,
+    "routePaint": true,
+    "lensPaint": false,
+    "cameraMode": "semantic"
+  },
+  "direct-lens-from-map": {
+    "modes": {
+      "route": false,
+      "map": true,
+      "lens": true
+    },
+    "buttons": {
+      "route": false,
+      "map": true,
+      "lens": true
+    },
+    "panels": {
+      "route": false,
+      "map": true,
+      "lens": false
+    },
+    "lens": [
+      "database"
+    ],
+    "route": null,
+    "hash": "#lens=database",
+    "playing": false,
+    "routePaint": false,
+    "lensPaint": true,
+    "cameraMode": "manual"
+  }
+}

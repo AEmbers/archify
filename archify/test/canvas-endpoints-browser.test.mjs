@@ -60,6 +60,8 @@ test('native canvas drags reach both ends of long, wide and optional local diagr
         return run(`(()=>{const node=[...document.querySelectorAll('.diagram-container > svg [data-node-id]')].find(n=>n.dataset.nodeId===${JSON.stringify(end.id)}),r=node.getBoundingClientRect(),s=Archify.viewerChromeLayout.stageRect();return {node:{x:r.left+r.width/2,y:r.top+r.height/2},stage:s,state:Archify.view.state(),page:[scrollX,scrollY],range:[document.scrollingElement.scrollWidth-innerWidth,document.scrollingElement.scrollHeight-innerHeight]};})()`);
       }
       let current = await geometry();
+      const pageFixed = g => { assert.deepEqual(g.page,[0,0]);assert.ok(g.range.every(value=>value<=1),JSON.stringify(g)); };
+      pageFixed(current);
       const visible = g => g.node.x >= g.stage.left + 8 && g.node.x <= g.stage.right - 8 && g.node.y >= g.stage.top + 8 && g.node.y <= g.stage.bottom - 8;
       if (!visible(current)) initiallyOutside = true;
       let drags = 0;
@@ -67,7 +69,7 @@ test('native canvas drags reach both ends of long, wide and optional local diagr
       // Repeated grabs model a user traversing a document longer than the screen.
       while (drags < 150) {
         const stage = current.stage;
-        const x = (stage.left + stage.right) / 2, y = (stage.top + stage.bottom) / 2;
+        const x = (Math.max(0,stage.left) + Math.min(1440,stage.right)) / 2, y = (Math.max(0,stage.top) + Math.min(800,stage.bottom)) / 2;
         const dx = x - current.node.x, dy = y - current.node.y;
         if (Math.abs(dx) < 2 && Math.abs(dy) < 2) break;
         const fraction = Math.min(1, (stage.right - stage.left) / 3 / Math.max(1, Math.abs(dx)), (stage.bottom - stage.top) / 3 / Math.max(1, Math.abs(dy)));
@@ -80,14 +82,14 @@ test('native canvas drags reach both ends of long, wide and optional local diagr
         await frames();
         await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x + dx * fraction, y: y + dy * fraction, button: 'middle', buttons: 0, clickCount: 1 });
         await frames();
-        current = await geometry();
+        current = await geometry(); pageFixed(current);
         drags++;
       }
       await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
       assert.ok(visible(current), JSON.stringify({ fixture: fixture.name, end, drags, current }));
       assert.equal(current.state.scale, initial.state.scale);
       assert.deepEqual(current.page, [0, 0]);
-      assert.ok(current.range.every(value => value <= 1));
+      assert.ok(current.range[0] <= 1);
       assert.equal(await run(`document.querySelector('.diagram-container').classList.contains('is-panning')`), false);
       if (evidence) {
         const shot = await send('Page.captureScreenshot', { format: 'png' });

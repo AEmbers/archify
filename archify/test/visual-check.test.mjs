@@ -10,13 +10,18 @@ import { PassThrough } from 'node:stream';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
+  CHROME_STARTUP_TIMEOUT_MS,
+  verticalBudgetFixes,
   ChromeVisualBrowser,
   VISUAL_CHECK_VIEWPORTS,
   chromeVisualBrowserArgs,
   findChrome,
   persistVisualCheckFailure,
   runVisualCheck,
+  runBrowserCheck,
+  browserCheckSidecarPaths,
   sidecarPaths,
+  summarizeBrowserEvidence,
 } from '../bin/visual-check.mjs';
 import { sameLocation } from '../renderers/shared/path-semantics.mjs';
 
@@ -24,6 +29,33 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillRoot = path.resolve(__dirname, '..');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-visual-check-'));
 const png = Buffer.from('89504e470d0a1a0a', 'hex');
+
+test('summary indexes every captured viewport/theme and preserves failed diagnostics', async () => {
+  const input = artifact('summary-captures.html');
+  const result = await runVisualCheck({ artifactPath: input, browserFactory: () => fakeBrowser() });
+  const receipt = result.receipt;
+  const summary = summarizeBrowserEvidence(receipt);
+  assert.equal(summary.visualReview, 'pending');
+  assert.equal(summary.evidence.screenshots.length, 4);
+  for (const capture of summary.evidence.screenshots) {
+    assert.ok(path.isAbsolute(capture.path));
+    assert.ok(fs.existsSync(capture.path));
+    assert.ok(['light', 'dark'].includes(capture.theme));
+  }
+  assert.deepEqual(summary.evidence.screenshots.map(({ width, height, theme }) => [width, height, theme]),
+    receipt.captures.screenshots.map(({ width, height, theme }) => [width, height, theme]));
+  assert.ok(fs.existsSync(summary.evidence.receipt));
+  assert.ok(fs.existsSync(summary.evidence.contactSheet));
+  assert.ok(JSON.stringify(summary).length < JSON.stringify(receipt).length / 2);
+  const diagnostic = { code: 'viewer/example', severity: 'error', evidence: { gap: 3 }, supportedFixes: ['reposition'] };
+  const failed = summarizeBrowserEvidence({ ...receipt, ok: false, status: 'fail', diagnostics: [diagnostic] });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.status, 'fail');
+  assert.deepEqual(failed.diagnostics, [diagnostic]);
+  assert.equal(failed.evidence.receipt, undefined);
+  assert.equal(failed.evidence.contactSheet, undefined);
+  assert.deepEqual(failed.evidence.screenshots, [], 'unpublished capture metadata is not an evidence link');
+});
 
 function artifact(name = 'diagram.html') {
   const file = path.join(tmp, name);
@@ -44,7 +76,20 @@ function stagingDirectories(directory) {
   return fs.readdirSync(directory).filter((name) => name.startsWith('.archify-visual-check-'));
 }
 
-function fakeBrowser({ overflowAt, unreadableAt, chromeCollisionAt, stageCollisionAt, stageGapAt, screenshotFailure } = {}) {
+function fakeBrowser({
+  overflowAt,
+  tallAt,
+  readableScrollAt,
+  authoredScrollAt,
+  authoredDiagramType = 'architecture',
+  authoredUnclipped = true,
+  unreadableAt,
+  chromeCollisionAt,
+  stageCollisionAt,
+  stageGapAt,
+  screenshotFailure,
+  resolvedThemeAt,
+} = {}) {
   const calls = [];
   return {
     calls,
@@ -58,6 +103,9 @@ function fakeBrowser({ overflowAt, unreadableAt, chromeCollisionAt, stageCollisi
         else fs.writeFileSync(screenshotPath, png, { flag: 'wx' });
       }
       const overflow = overflowAt?.({ width, height, theme }) || false;
+      const tall = tallAt?.({ width, height, theme }) || false;
+      const readableScroll = readableScrollAt?.({ width, height, theme }) || false;
+      const authoredScroll = authoredScrollAt?.({ width, height, theme }) || false;
       const unreadable = unreadableAt?.({ width, height, theme }) || false;
       const chromeCollision = chromeCollisionAt?.({ width, height, theme }) || false;
       const stageCollision = stageCollisionAt?.({ width, height, theme }) || false;
@@ -67,8 +115,19 @@ function fakeBrowser({ overflowAt, unreadableAt, chromeCollisionAt, stageCollisi
         innerWidth: width,
         innerHeight: height,
         scrollWidth: width + (overflow ? 1 : 0),
-        scrollHeight: height,
-        resolvedTheme: theme,
+        scrollHeight: height + (readableScroll || authoredScroll ? 240 : 0) + (tall ? 300 : 0),
+        resolvedTheme: resolvedThemeAt?.({ width, height, theme }) ?? theme,
+        ...(tall ? {
+          pageComposition: {
+            bodyPaddingPx: 12, headerPx: 100, diagramChromePx: 76,
+            svgPx: 800, cardsPx: 212, viewBoxHeight: 1000,
+          },
+        } : {}),
+        readerLayout: readableScroll ? 'adaptive' : null,
+        readerOverflow: readableScroll ? 'authored' : null,
+        readerFit: readableScroll ? 'intrinsic-height' : authoredScroll ? 'authored-height' : null,
+        diagramType: authoredScroll ? authoredDiagramType : null,
+        documentScrollUnclipped: authoredScroll && authoredUnclipped,
         readerWidth: 960,
         diagramWidth: 930,
         viewBoxWidth: 1300,
@@ -2065,6 +2124,34 @@ test('visual-check restore rollback preserves a successor swapped at its public 
   assert.deepEqual(entryIdentity(outputs.contactSheet), successorIdentity);
 });
 
+test('visual-check keeps slow Chrome startup inside one bounded gate invocation', async () => {
+  assert.equal(CHROME_STARTUP_TIMEOUT_MS, 90000);
+  const input = artifact('chrome-startup-timeout.html');
+  const child = fakeChromeChild();
+
+  const result = await runVisualCheck({
+    artifactPath: input,
+    chromePath: '/fake/chrome',
+    browserFactory: async () => new ChromeVisualBrowser('/fake/chrome', {
+      startupTimeoutMs: 5,
+      spawnImpl: () => child,
+    }),
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.receipt.diagnostics[0]?.code, 'viewer/chrome-startup-timeout');
+  assert.match(result.receipt.error, /Target\.getTargets: timed out after 5ms/);
+  assert.match(result.receipt.error, /Chrome process: still running/);
+  assert.match(
+    result.receipt.diagnostics[0]?.supportedFixes?.join('\n') || '',
+    /do not edit or simplify the artifact/,
+  );
+  assert.match(
+    result.receipt.diagnostics[0]?.supportedFixes?.join('\n') || '',
+    /retry visual-check once.*stop and report the environment failure/,
+  );
+});
+
 for (const scenario of [
   { name: 'backup unlink', fault: 'unlink' },
   { name: 'staging rmdir', fault: 'rmdir' },
@@ -2150,6 +2237,12 @@ for (const scenario of [
       scenario.fault === 'unlink' ? oldContactSheet : claimantBytes,
     );
     assert.equal(JSON.parse(fs.readFileSync(outputs.receipt, 'utf8')).status, 'pass');
+    const summary = summarizeBrowserEvidence(result.receipt);
+    assert.equal(summary.status, 'fail', 'cleanup failure stays visible after evidence was committed');
+    assert.equal(fs.realpathSync.native(summary.evidence.receipt), fs.realpathSync.native(outputs.receipt));
+    assert.deepEqual(summary.publication, result.receipt.publication);
+    assert.equal(summary.publication.recoveryDirectory, expectedRecovery);
+    assert.deepEqual(summary.diagnostics, result.receipt.diagnostics);
     assert.equal(fs.existsSync(outputs.contactSheet), true);
     assert.equal(outputs.screenshots.every((entry) => fs.existsSync(entry.path)), true);
   });
@@ -2542,6 +2635,95 @@ test('visual-check returns 1 and preserves evidence when any viewport overflows'
   assert.equal(fs.existsSync(sidecarPaths(input).contactSheet), true);
 });
 
+test('vertical overflow fixes state the stacked page budget and the actionable target', () => {
+  const page = { bodyPaddingPx: 12, headerPx: 100, diagramChromePx: 76, svgPx: 800, cardsPx: 212, viewBoxHeight: 1000 };
+  const base = { overflowY: true, innerHeight: 900, scrollHeight: 1200, diagramWidth: 930, pageComposition: page };
+
+  const atMinimum = verticalBudgetFixes({ ...base, readerLayout: 'adaptive', readerOverflow: 'authored' });
+  assert.match(atMinimum[0], /300px too tall/);
+  assert.match(atMinimum[0], /12px body padding \+ 100px header \+ 76px diagram chrome \+ 800px SVG \+ 212px cards = 1200px against 900px/);
+  assert.match(atMinimum[0], /reduce the viewBox height to at most 625 \(from 1000\)/, 'SVG height follows viewBox height at the fixed minimum width: 1000 * 500 / 800');
+  assert.equal(atMinimum.length, 1, 'cards (212px) cannot absorb a 300px excess, so no card alternative is offered');
+
+  const fullWidth = verticalBudgetFixes({ ...base, readerLayout: null, readerOverflow: null });
+  assert.match(fullWidth[0], /viewBox ratio is below 1\.55/);
+  assert.match(fullWidth[0], /remove meta\.viewBox|1\.55x wider than tall/);
+
+  const cardsAbsorb = verticalBudgetFixes({ ...base, scrollHeight: 1000, readerLayout: 'adaptive', readerOverflow: 'authored' });
+  assert.match(cardsAbsorb[1], /cards take at most 112px/);
+
+  assert.deepEqual(verticalBudgetFixes({ ...base, pageComposition: undefined }), [], 'old artifacts without composition metrics keep the generic fix');
+  assert.deepEqual(verticalBudgetFixes({ ...base, overflowY: false }), []);
+});
+
+test('visual-check reports the page composition when a viewport overflows vertically', async () => {
+  const input = artifact('tall-overflow.html');
+  const result = await runVisualCheck({
+    artifactPath: input,
+    chromePath: '/fake/chrome',
+    browserFactory: async () => fakeBrowser({ tallAt: ({ width }) => width === 1440 }),
+  });
+
+  assert.equal(result.exitCode, 1);
+  const diagnostic = result.receipt.diagnostics.find((entry) => entry.code === 'viewer/viewport-overflow');
+  assert.equal(diagnostic.evidence.pageComposition.svgPx, 800);
+  assert.match(diagnostic.evidence.pageCompositionMeasurement, /sum to scrollHeight/);
+  assert.match(diagnostic.supportedFixes[0], /300px too tall/);
+  assert.equal(diagnostic.supportedFixes.some((fix) => /contain the rendered layout within/.test(fix)), false, 'the numeric budget replaces the generic instruction');
+  const viewport = result.receipt.containment.viewports.find(({ width }) => width === 1440);
+  assert.equal(viewport.pageComposition.cardsPx, 212);
+});
+
+test('visual-check accepts only Reader-declared readable vertical page scrolling', async () => {
+  const input = artifact('readable-scroll.html');
+  const target = ({ width, theme }) => width === 1440 && theme === 'light';
+  const result = await runVisualCheck({
+    artifactPath: input,
+    chromePath: '/fake/chrome',
+    browserFactory: async () => fakeBrowser({ readableScrollAt: target }),
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.receipt.status, 'pass');
+  assert.equal(result.receipt.containment.status, 'pass');
+  assert.equal(result.receipt.containment.policy, 'camera-viewport-or-fit-or-reader-declared-readable-vertical-scroll');
+  const viewport = result.receipt.containment.viewports.find(({ width }) => width === 1440);
+  assert.equal(viewport.overflowY, true);
+  assert.equal(viewport.verticalScrollAccepted, true);
+  assert.equal(viewport.overflowDisposition, 'readable-vertical-scroll');
+  assert.equal(viewport.readerLayout, 'adaptive');
+  assert.equal(viewport.readerOverflow, 'authored');
+  assert.equal(viewport.readerFit, 'intrinsic-height');
+  assert.equal(result.receipt.diagnostics.some(({ code }) => code === 'viewer/viewport-overflow'), false);
+});
+
+test('visual-check still rejects horizontal overflow and unreadable text in Reader scroll state', async () => {
+  const input = artifact('invalid-readable-scroll.html');
+  const target = ({ width, theme }) => width === 1440 && theme === 'light';
+  const horizontal = await runVisualCheck({
+    artifactPath: input,
+    chromePath: '/fake/chrome',
+    browserFactory: async () => fakeBrowser({ overflowAt: target, readableScrollAt: target }),
+  });
+  const horizontalViewport = horizontal.receipt.containment.viewports.find(({ width }) => width === 1440);
+  assert.equal(horizontal.exitCode, 1);
+  assert.equal(horizontalViewport.verticalScrollAccepted, false);
+  assert.equal(horizontalViewport.overflowDisposition, 'unexpected-overflow');
+  assert.ok(horizontal.receipt.diagnostics.some(({ code }) => code === 'viewer/viewport-overflow'));
+
+  const unreadable = await runVisualCheck({
+    artifactPath: input,
+    chromePath: '/fake/chrome',
+    browserFactory: async () => fakeBrowser({ readableScrollAt: target, unreadableAt: target }),
+  });
+  const unreadableViewport = unreadable.receipt.containment.viewports.find(({ width }) => width === 1440);
+  assert.equal(unreadable.exitCode, 1);
+  assert.equal(unreadableViewport.verticalScrollAccepted, false);
+  assert.equal(unreadableViewport.overflowDisposition, 'unexpected-overflow');
+  assert.ok(unreadable.receipt.diagnostics.some(({ code }) => code === 'viewer/viewport-overflow'));
+  assert.ok(unreadable.receipt.diagnostics.some(({ code }) => code === 'viewer/projected-text-readability'));
+});
+
 test('visual-check refuses changed delivery evidence before launching a browser', async () => {
   const input = artifact('changed-before-browser.html');
   const outDir = path.join(tmp, 'changed-before-browser-evidence');
@@ -2912,4 +3094,123 @@ test('visual-check reports local inspection cleanup failure alongside an evidenc
     && entry.recoveryDirectory === inspectionDirectory
     && /synthetic inspection cleanup denied/.test(entry.reason)
   )), 'the conflict must report the retained local inspection directory');
+});
+
+test('browser-check proves rendered behavior without creating screenshots or requiring perceptual review', async () => {
+  const input = artifact('browser-check-passing.html');
+  const browser = fakeBrowser();
+  const result = await runBrowserCheck({
+    artifactPath: input,
+    chromePath: '/fake/chrome',
+    browserFactory: async () => browser,
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.receipt.command, 'browser-check');
+  assert.equal(result.receipt.status, 'pass');
+  assert.equal(result.receipt.visualReview, 'not-requested');
+  assert.equal(result.receipt.themeStates.status, 'pass');
+  assert.equal(result.receipt.themeStates.viewports.length, 6);
+  assert.equal(result.receipt.captures.status, 'not-requested');
+  assert.deepEqual(result.receipt.captures.screenshots, []);
+  assert.equal(result.receipt.captures.contactSheet, null);
+  assert.equal(browser.calls.length, VISUAL_CHECK_VIEWPORTS.length + 2);
+  assert.equal(browser.calls.every(({ screenshotPath }) => screenshotPath === undefined), true);
+
+  const outputs = browserCheckSidecarPaths(input);
+  assert.equal(fs.existsSync(outputs.receipt), true);
+  assert.equal(fs.existsSync(outputs.contactSheet), false);
+  assert.equal(outputs.screenshots.every(({ path: screenshot }) => !fs.existsSync(screenshot)), true);
+});
+
+test('browser-check fails when an endpoint theme does not resolve without needing image inspection', async () => {
+  const input = artifact('browser-check-theme-mismatch.html');
+  const browser = fakeBrowser({
+    resolvedThemeAt: ({ theme }) => theme === 'dark' ? 'light' : theme,
+  });
+  const result = await runBrowserCheck({
+    artifactPath: input,
+    chromePath: '/fake/chrome',
+    browserFactory: async () => browser,
+  });
+
+  assert.equal(result.exitCode, 1);
+  assert.equal(result.receipt.status, 'fail');
+  assert.equal(result.receipt.themeStates.status, 'fail');
+  assert.equal(result.receipt.themeStates.viewports.filter(({ ok }) => !ok).length, 2);
+  assert.equal(result.receipt.diagnostics.filter(({ code }) => code === 'viewer/theme-state').length, 2);
+  assert.equal(result.receipt.captures.status, 'not-requested');
+});
+
+for (const [command, run] of [['browser-check', runBrowserCheck], ['visual-check', runVisualCheck]]) {
+  for (const width of [1600, 1920]) {
+    test(`${command} rejects a mismatched light theme at the ${width}px intermediate viewport`, async () => {
+      const input = artifact(`${command}-intermediate-theme-${width}.html`);
+      const browser = fakeBrowser({
+        resolvedThemeAt: (entry) => entry.width === width ? 'dark' : entry.theme,
+      });
+      const result = await run({
+        artifactPath: input,
+        chromePath: '/fake/chrome',
+        browserFactory: async () => browser,
+      });
+
+      assert.equal(result.exitCode, 1);
+      assert.equal(result.receipt.ok, false);
+      assert.equal(result.receipt.status, 'fail');
+      assert.equal(result.receipt.themeStates.status, 'fail');
+      assert.deepEqual(result.receipt.themeStates.viewports.filter(({ ok }) => !ok), [{
+        width, height: width === 1600 ? 1000 : 1080,
+        requestedTheme: 'light', resolvedTheme: 'dark', ok: false,
+      }]);
+      assert.equal(result.receipt.diagnostics.filter(({ code }) => code === 'viewer/theme-state').length, 1);
+    });
+  }
+}
+
+
+test('authored Architecture scroll requires readable unclipped document flow and preserves other modes', async () => {
+  const input = artifact('authored-scroll.html');
+  const target = ({ width, theme }) => width === 1440 && theme === 'light';
+  for (const [name, options, accepted] of [
+    ['readable document', {}, true],
+    ['other diagram mode', { authoredDiagramType: 'workflow' }, false],
+    ['missing mode', { authoredDiagramType: null }, false],
+    ['clipped or internally scrolled SVG', { authoredUnclipped: false }, false],
+    ['unreadable text', { unreadableAt: target }, false],
+    ['horizontal overflow', { overflowAt: target }, false],
+  ]) {
+    const result = await runVisualCheck({
+      artifactPath: input, outDir: path.join(tmp, `authored-${name.replace(/[^a-z]/g, '-')}`),
+      chromePath: '/fake/chrome',
+      browserFactory: async () => fakeBrowser({ authoredScrollAt: target, ...options }),
+    });
+    const viewport = result.receipt.containment.viewports.find(({ width }) => width === 1440);
+    assert.equal(result.exitCode, accepted ? 0 : 1, name);
+    assert.equal(viewport.verticalScrollAccepted, accepted, name);
+    assert.equal(viewport.readerLayout, null, 'the fixed canvas does not acquire adaptive scaling');
+  }
+});
+
+
+test('fixed viewport acceptance requires camera, reader and root access evidence', async () => {
+  const input=artifact('bounded-camera.html');
+  for(const [name,proof,overflow] of [
+    ['complete',{camera:true,reader:true,page:true},false],
+    ['camera-disabled',{camera:false,reader:true,page:true},false],
+    ['reader-clipped',{camera:true,reader:false,page:true},false],
+    ['page-moves',{camera:true,reader:true,page:false},false],
+    ['marker-alone',undefined,false],
+    ['page-overflow',{camera:true,reader:true,page:true},true],
+  ]){
+    const result=await runVisualCheck({artifactPath:input,chromePath:'/fake/chrome',
+      browserFactory:async()=>{const browser=fakeBrowser({tallAt:()=>overflow});
+        const inspect=browser.inspect;
+        browser.inspect=async options=>({...await inspect(options),fixedCanvas:true,viewportAccess:proof});
+        return browser;}});
+    assert.equal(result.exitCode,name==='complete'?0:1,name);
+    const viewport=result.receipt.containment.viewports[0];
+    assert.equal(viewport.ok,name==='complete',name);
+    if(name==='complete')assert.equal(viewport.overflowDisposition,'camera-viewport');
+  }
 });

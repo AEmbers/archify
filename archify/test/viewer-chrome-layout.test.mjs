@@ -132,7 +132,7 @@ async function finalGeometry(browser, sessionId) {
         Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
     }
     var container = document.querySelector('.diagram-container');
-    var legend = document.querySelector('[data-legend]');
+    var legend = container.hasAttribute('data-fixed-legend') ? container.querySelector('.fixed-legend') : container.querySelector('[data-legend]');
     var nav = document.querySelector('.diagram-nav');
     var svg = container && container.querySelector(':scope > svg');
     var lens = document.getElementById('semantic-lens');
@@ -296,8 +296,8 @@ test('Dock Safe Rail keeps typed renderers clear across themes, Presentation, an
       assert.equal(receipt.dockStageIntersectionArea, 0, message);
       assert.ok(receipt.scrollWidth <= receipt.innerWidth, message);
       assert.ok(receipt.navBottom <= receipt.containerBottom + 0.5, message);
-      // Desktop cards occupy a sidebar; short windows retain document flow.
-      if (entry.present || (entry.width >= 1024 && entry.height >= 600)) {
+      // Normal reading retains dev document flow; Presentation fits the viewport.
+      if (entry.present) {
         assert.ok(receipt.scrollHeight <= receipt.innerHeight, message);
       }
       // An automatic overview can be smaller than the reading threshold.
@@ -413,7 +413,7 @@ test('a real 5px Legend gap keeps the stage rail and Legend clear', {
     const sessionId = await load(browser, render('architecture', CASES.architecture));
     await evaluate(browser, sessionId, `(function () {
       var container = document.querySelector('.diagram-container');
-      var legend = document.querySelector('[data-legend]');
+      var legend = container.hasAttribute('data-fixed-legend') ? container.querySelector('.fixed-legend') : container.querySelector('[data-legend]');
       var nav = document.querySelector('.diagram-nav');
       var legendRect = legend.getBoundingClientRect();
       var containerRect = container.getBoundingClientRect();
@@ -441,7 +441,7 @@ test('Presentation keeps its visible Dock clear of a colliding Legend', {
     const sessionId = await load(browser, render('architecture', CASES.architecture), { query: '?present=1' });
     await evaluate(browser, sessionId, `(function () {
       var container = document.querySelector('.diagram-container');
-      var legend = document.querySelector('[data-legend]');
+      var legend = container.hasAttribute('data-fixed-legend') ? container.querySelector('.fixed-legend') : container.querySelector('[data-legend]');
       var nav = document.querySelector('.diagram-nav');
       var legendRect = legend.getBoundingClientRect();
       var containerRect = container.getBoundingClientRect();
@@ -593,7 +593,7 @@ test('live camera transitions keep authored relationship paint outside the Dock 
 
       assert.deepEqual(result.hits, [], `${scenario.name}: ${JSON.stringify(result.hits)}`);
       if (scenario.clearsClip) {
-        assert.match(result.clipPath, /^inset\(/, `${scenario.name}: fixed canvas retains the visible stage clip`);
+        assert.match(result.clipPath, /^inset\(/, `${scenario.name}: bounded overview keeps authored paint outside the navigation reserve`);
       }
     }
   } finally {
@@ -700,7 +700,12 @@ test('zoomed camera restores its bounded desktop rail after crossing the mobile 
     assert.ok(Math.abs(restored.reserve - baseline.reserve) <= 1, JSON.stringify({ baseline, zoomed, restored }));
     assert.equal(restored.receiptReserve, restored.reserve, JSON.stringify(restored));
     assert.equal(restored.receiptEligible, true, JSON.stringify(restored));
-    assert.ok(restored.scrollHeight <= restored.innerHeight, JSON.stringify(restored));
+    // Reading-size preservation may require ordinary page scroll before zoom.
+    // Crossing the breakpoint must restore that same layout, not grow it.
+    assert.ok(Math.abs(restored.scrollHeight - baseline.scrollHeight) <= 1, JSON.stringify({ baseline, restored }));
+    assert.ok(Math.abs(restored.containerHeight - baseline.containerHeight) <= 1, JSON.stringify({ baseline, restored }));
+    assert.ok(restored.scrollWidth <= restored.innerWidth, JSON.stringify(restored));
+    assert.equal(restored.dockStageIntersectionArea, 0, JSON.stringify(restored));
   } finally {
     await browser.close();
   }
@@ -948,8 +953,8 @@ test('Chrome Layout preserves scheduling, mode restoration and Reader handoffs',
         await resize(width);
         const current = await state(`threshold-${width}-${observations.length}`);
         assert.equal(current.geometry.receiptEligible, width > 720);
-        assert.equal(current.reader, null);
-        assert.equal(current.fixed, width >= 1024);
+        assert.equal(current.reader, width > 720 ? 'adaptive' : null);
+        assert.equal(current.fixed, width > 720);
         assert.equal(current.viewBox, initial.viewBox);
         if (width <= 720) zero(current);
         else clearStage(current);
@@ -1106,6 +1111,52 @@ test('Chrome Layout preserves scheduling, mode restoration and Reader handoffs',
     });
   } finally {
     if (evidence) fs.writeFileSync(path.join(evidence, 'observations.json'), JSON.stringify(observations, null, 2) + '\n');
+  }
+});
+
+test('theme switches repaint the page and diagram without dropping the desktop rail', {
+  skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
+}, async () => {
+  const file = render('architecture', CASES.architecture);
+  const browser = new ChromeVisualBrowser(chromePath);
+  try {
+    const session = await load(browser, file, { query: '?theme=dark' });
+    for (const theme of ['light', 'dark']) {
+      const result = await evaluate(browser, session, `(async function () {
+        var root = document.documentElement;
+        var panel = document.querySelector('.diagram-container');
+        function sample() {
+          var rect = panel.getBoundingClientRect();
+          return {
+            theme: root.getAttribute('data-theme'),
+            body: getComputedStyle(document.body).backgroundColor,
+            panel: getComputedStyle(panel).backgroundColor,
+            rail: root.getAttribute('data-nav-stage-rail'),
+            width: rect.width,
+            height: rect.height
+          };
+        }
+        var before = sample();
+        document.getElementById('btn-theme').click();
+        var frames = [sample()];
+        for (var i = 0; i < 8; i++) {
+          await new Promise(function (resolve) { requestAnimationFrame(resolve); });
+          frames.push(sample());
+        }
+        return { before: before, frames: frames };
+      })()`, true);
+      assert.equal(result.before.rail, 'true', 'fixture exercises the reserved stage rail');
+      assert.equal(result.frames.at(-1).theme, theme);
+      assert.notEqual(result.before.body, result.frames.at(-1).body);
+      assert.notEqual(result.before.panel, result.frames.at(-1).panel);
+      assert.ok(result.frames.every((frame) => frame.body === result.frames.at(-1).body),
+        'the page background must reach the new theme in the first paint');
+      assert.ok(result.frames.every((frame) => frame.rail === result.before.rail
+        && frame.width === result.before.width && frame.height === result.before.height),
+        'theme switching must not remove the rail or move the diagram');
+    }
+  } finally {
+    await browser.close();
   }
 });
 

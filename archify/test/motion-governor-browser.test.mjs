@@ -38,9 +38,9 @@ test('Motion Governor preserves mode, ownership, ambient completion and real cal
   files.static = path.join(scratch, 'static.html');
   execFileSync(process.execPath, [path.join(skillRoot, 'renderers/architecture/render-architecture.mjs'),
     path.join(skillRoot, 'examples', cases.architecture), files.static]);
-  const browser = new ChromeVisualBrowser(chrome);
+  let browser = new ChromeVisualBrowser(chrome);
   t.after(() => browser.close());
-  const session = await browser.sessionPromise;
+  let session = await browser.sessionPromise;
   await browser.cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' });
   const send = (method, params = {}) => browser.cdp.send(method, params, session);
   async function run(expression) {
@@ -60,10 +60,17 @@ test('Motion Governor preserves mode, ownership, ambient completion and real cal
     const expectedNavigation = ++navigationId;
     if (!preserveStorage) {
       fixtureUrl = pathToFileURL(files[mode]).href + `?theme=${theme}&testNavigation=${expectedNavigation}${query}`;
-      // Reset the disposable browser profile before navigation. Touching
-      // localStorage in a new-document script can disturb file-backed storage
-      // in Chrome; leave startup and reload reads to the Viewer itself.
-      await send('Storage.clearDataForStorageKey', { storageKey: 'file:///', storageTypes: 'local_storage' });
+      // file:// storage is keyed differently across Chrome platforms. Clearing
+      // the synthetic file:/// key can leave the actual file's saved intent.
+      // Fresh cases get a fresh profile; persistence cases still reload the
+      // same document in the same browser and let the Viewer read its storage.
+      if (expectedNavigation > 1) {
+        await browser.close();
+        browser = new ChromeVisualBrowser(chrome);
+        session = await browser.sessionPromise;
+        startup = undefined;
+        await browser.cdp.send('Browser.setDownloadBehavior', { behavior: 'deny' });
+      }
     }
     if (startup) await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: startup });
     ({ identifier: startup } = await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
@@ -260,7 +267,7 @@ test('Motion Governor preserves mode, ownership, ambient completion and real cal
         assert.equal((await snapshot('legacy-media-changed')).mode, 'still');
       }
     }
-    for (const query of ['&embed=1', '&play=1']) {
+    for (const query of ['&embed=1']) {
       await load('architecture', { query });
       // Share playback sets its root flag after Governor initialization.
       await run(`motionWait(() => document.documentElement.getAttribute('data-ambient-settle-reason') === 'suppressed')`);
@@ -270,23 +277,7 @@ test('Motion Governor preserves mode, ownership, ambient completion and real cal
     assert.equal((await snapshot('initial-hidden-fixture')).mode, 'still');
   });
 
-  await t.test('Motion pauses actual Story, handoff and Route without discarding elapsed dwell', async () => {
-    await load();
-    await run(`Archify.guidedViews.activate('request-path'); motionWait(() => !Archify.guidedViews.handoff())`);
-    assert.equal(await run('Archify.guidedViews.play()'), true);
-    assert.equal(await run('Archify.guidedViews.isPlaying()'), true);
-    await run('Archify.motionGovernor.pause()');
-    assert.equal(await run('Archify.guidedViews.isPlaying()'), false);
-    await run('Archify.motionGovernor.resume()');
-    assert.equal(await run('Archify.guidedViews.isPlaying()'), false);
-    await load();
-    await run(`Archify.guidedViews.activate('request-path'); motionWait(() => !Archify.guidedViews.handoff())`);
-    const handoff = await run(`(() => {
-      Archify.guidedViews.activate('identity-and-cache');
-      const before=Archify.guidedViews.handoff(); Archify.motionGovernor.pause();
-      return {before:!!before,after:Archify.guidedViews.handoff()};
-    })()`);
-    assert.deepEqual(handoff, {before:true,after:null});
+  await t.test('Motion pauses actual Route without discarding elapsed dwell', async () => {
     await load();
     const route = await run(`(async () => {
       Archify.routeProbe.begin({source:'users'}); Archify.routeProbe.choose('db');

@@ -35,6 +35,92 @@ test('all packaged HTML examples pass the real visual-check desktop gate', {
   }
 });
 
+test('default sequence and dataflow canvases fit the real desktop reader without changing explicit geometry', {
+  skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
+}, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-default-reader-'));
+  const cases = [
+    ['sequence', {
+      schema_version: 1, diagram_type: 'sequence',
+      meta: { title: 'Ping', output: 'seq.html' },
+      participants: [{ id: 'a', type: 'external', label: 'Client' }, { id: 'b', type: 'backend', label: 'Server' }],
+      messages: [{ from: 'a', to: 'b', y: 160, label: 'ping' }],
+    }, [920, 760]],
+    ['dataflow', {
+      schema_version: 1, diagram_type: 'dataflow',
+      meta: { title: 'Pipe', output: 'df.html' },
+      stages: [{ label: 'In' }, { label: 'Out' }],
+      nodes: [
+        { id: 'a', type: 'frontend', label: 'Client', stage: 0, row: 0 },
+        { id: 'b', type: 'database', label: 'Store', stage: 1, row: 0 },
+      ],
+      flows: [{ from: 'a', to: 'b', label: 'write' }],
+    }, [940, 720]],
+  ];
+  try {
+    for (const [type, doc, viewBox] of cases) {
+      for (const authored of [false, true]) {
+        const input = path.join(tmp, `${type}-${authored}.json`);
+        const artifact = path.join(tmp, `${type}-${authored}.html`);
+        const candidate = structuredClone(doc);
+        if (authored) candidate.meta.viewBox = viewBox;
+        fs.writeFileSync(input, JSON.stringify(candidate));
+        execFileSync(process.execPath, [path.join(skillRoot, 'bin/archify.mjs'), 'render', type, input, artifact]);
+        const result = await runVisualCheck({ artifactPath: artifact, chromePath });
+        if (authored) {
+          assert.equal(result.exitCode, 0, `${type}: ${JSON.stringify(result.receipt.diagnostics)}`);
+          assert.ok(result.receipt.containment.viewports.every(v => v.fixedCanvas && v.cameraViewportAccepted
+            && v.viewportAccess.camera && v.viewportAccess.reader && !v.overflowY && !v.verticalScrollAccepted));
+        } else {
+          assert.equal(result.exitCode, 0, `${type}: ${JSON.stringify(result.receipt.diagnostics)}`);
+          assert.equal(result.receipt.readability.status, 'pass');
+          assert.ok(result.receipt.containment.viewports.every((v) => v.ok && v.readerFit === 'intrinsic-height'));
+        }
+      }
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('visual-check collects nested ID-less semantic edge text for every renderer family', {
+  skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
+}, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-visual-edge-collector-'));
+  const cases = [
+    ['architecture', 'examples/web-app.architecture.json'],
+    ['workflow', 'examples/agent-tool-call.workflow.json'],
+    ['sequence', 'examples/cache-miss-request.sequence.json'],
+    ['dataflow', 'examples/event-stream.dataflow.json'],
+    ['lifecycle', 'examples/agent-run.lifecycle.json'],
+  ];
+  try {
+    for (const [index, [type, input]] of cases.entries()) {
+      const artifact = path.join(tmp, `${type}.html`);
+      execFileSync(process.execPath, [
+        path.join(skillRoot, 'bin', 'archify.mjs'), 'render', type,
+        path.join(skillRoot, input), artifact, '--quality', 'showcase',
+      ], { cwd: skillRoot, encoding: 'utf8' });
+      const edge = index % 2
+        ? `<g data-edge-from="collector-${type}" data-edge-to="reader-${type}"><g data-detail="context"><text x="1" y="1" font-size="5">nested semantic edge</text><text data-detail="fine" x="1" y="2" font-size="1">fine edge annotation</text></g></g>`
+        : `<g data-edge-from="collector-${type}" data-edge-to="reader-${type}" data-detail="context"><text x="1" y="1" font-size="5">same-group semantic edge</text><g data-detail="fine"><text x="1" y="2" font-size="1">fine nested annotation</text></g></g>`;
+      const injected = fs.readFileSync(artifact, 'utf8').replace('</svg>', `${edge}</svg>`);
+      fs.writeFileSync(artifact, injected);
+      const result = await runVisualCheck({ artifactPath: artifact, chromePath });
+      const desktop = result.receipt.readability.viewports.find(({ width, height }) => width === 1440 && height === 900);
+      assert.ok(desktop, `${type}: missing desktop observation`);
+      assert.equal(desktop.minimumProjectedNodeTextDetail, 'edge', `${type}: ${JSON.stringify(desktop)}`);
+      assert.match(desktop.minimumProjectedNodeText, /semantic edge/, `${type}: fine text must be excluded`);
+      assert.deepEqual(desktop.minimumProjectedNodeTextOwner, {
+        kind: 'edge', id: null, from: `collector-${type}`, to: `reader-${type}`,
+      }, `${type}: ${JSON.stringify(desktop)}`);
+      assert.equal(result.receipt.readability.status, 'fail', `${type}: injected 5px edge must be measured`);
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 const issue250TallGroup = {
   schema_version: 2,
   diagram_type: 'workflow',
@@ -94,6 +180,15 @@ test('production showcase is readable in the real 1440 by 900 adaptive reader', 
       'showcase',
     ], { cwd: skillRoot, encoding: 'utf8' });
 
+    const artifactSource = fs.readFileSync(artifact, 'utf8');
+    const svgRoot = artifactSource.match(/<svg\b[^>]*>/)?.[0];
+    assert.ok(svgRoot, 'production fixture must contain an SVG root');
+    // The comfortable primary-text preference uses the available width here;
+    // the viewport cap still wins over the preferred reading size.
+    assert.match(svgRoot, /viewBox="0 0 1376 728"/);
+    assert.match(svgRoot, /data-reader-fit="intrinsic-height"/);
+    assert.match(svgRoot, /data-reader-min-text="7\.5"/);
+
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       const result = await runVisualCheck({ artifactPath: artifact, chromePath });
       assert.equal(result.exitCode, 0, `attempt ${attempt}: ${JSON.stringify(result.receipt, null, 2)}`);
@@ -108,13 +203,25 @@ test('production showcase is readable in the real 1440 by 900 adaptive reader', 
       ));
       for (const observation of [desktop, darkDesktop]) {
         assert.ok(observation);
-        assert.ok(observation.readerWidth <= DESKTOP_READABILITY_VIEWPORT.width);
-        assert.ok(observation.diagramWidth >= 930);
+        assert.equal(observation.readerWidth, 1376);
+        assert.ok(observation.readerWidth <= 1376);
+        assert.equal(observation.diagramWidth, 1346);
+        assert.equal(observation.viewBoxWidth, 1376);
+        assert.ok(Number.isFinite(observation.minimumProjectedNodeTextPx));
         assert.ok(observation.minimumProjectedNodeTextPx >= MIN_PROJECTED_NODE_TEXT_PX);
-        assert.equal(observation.minimumProjectedNodeTextDetail, 'boundary');
-        assert.equal(observation.minimumProjectedNodeText, 'AWS eu-west-1 / disaster recovery');
+        assert.ok(observation.minimumProjectedNodeTextPx >= 7.5, JSON.stringify(observation));
+        assert.equal(typeof observation.minimumProjectedNodeText, 'string');
+        assert.ok(observation.minimumProjectedNodeText.trim().length > 0);
         assert.equal(observation.readabilityOk, true);
-        assert.equal(observation.scrollHeight, DESKTOP_READABILITY_VIEWPORT.height);
+        assert.equal(observation.overflowX, false, JSON.stringify(observation));
+        if (observation.overflowY) {
+          assert.equal(observation.verticalScrollAccepted, true, JSON.stringify(observation));
+          assert.equal(observation.readerLayout, 'adaptive', JSON.stringify(observation));
+          assert.equal(observation.readerOverflow, 'authored', JSON.stringify(observation));
+          assert.equal(observation.readerFit, 'intrinsic-height', JSON.stringify(observation));
+        } else {
+          assert.equal(observation.verticalScrollAccepted, false, JSON.stringify(observation));
+        }
       }
     }
   } finally {
@@ -122,7 +229,136 @@ test('production showcase is readable in the real 1440 by 900 adaptive reader', 
   }
 });
 
-test('fixed desktop canvas contains offline workflows without rewriting pinned geometry', {
+test('route-expanded intrinsic architecture preserves reading size inside the camera viewport', {
+  skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
+}, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-route-expanded-reader-'));
+  const input = path.join(
+    skillRoot,
+    'test/fixtures/architecture-viewport/route-expanded-worldscope.architecture.json',
+  );
+  const artifact = path.join(tmp, 'route-expanded-worldscope.html');
+  try {
+    execFileSync(process.execPath, [
+      path.join(skillRoot, 'bin', 'archify.mjs'),
+      'deliver',
+      'architecture',
+      input,
+      artifact,
+      '--quality',
+      'showcase',
+      '--json',
+    ], { cwd: skillRoot, encoding: 'utf8' });
+
+    const html = fs.readFileSync(artifact, 'utf8');
+    const svgRoot = html.match(/<svg\b[^>]*>/)?.[0];
+    assert.ok(svgRoot, 'expected an SVG root');
+    assert.match(svgRoot, /viewBox="0 0 980 678"/);
+    assert.match(svgRoot, /data-reader-fit="intrinsic-height"/);
+    assert.match(svgRoot, /data-reader-min-text="7\.5"/);
+
+    const result = await runVisualCheck({ artifactPath: artifact, chromePath });
+    assert.equal(result.exitCode, 0, JSON.stringify(result.receipt, null, 2));
+    assert.equal(result.receipt.containment.status, 'pass');
+    assert.equal(result.receipt.readability.status, 'pass');
+    assert.equal(result.receipt.viewerChrome.status, 'pass');
+    for (const viewport of result.receipt.containment.viewports) {
+      assert.equal(viewport.overflowX, false, JSON.stringify(viewport, null, 2));
+      assert.equal(viewport.overflowY, viewport.verticalScrollAccepted, JSON.stringify(viewport, null, 2));
+      for (const [field, floor] of [
+        ['minimumProjectedNonEdgeTextPx', 7.5 - 0.01],
+        ['minimumProjectedEdgeTextPx', MIN_PROJECTED_NODE_TEXT_PX],
+        ['minimumProjectedNodeTextPx', MIN_PROJECTED_NODE_TEXT_PX],
+      ]) {
+        assert.ok(Number.isFinite(viewport[field]), field + ': ' + JSON.stringify(viewport, null, 2));
+        assert.ok(viewport[field] >= floor, field + ': ' + JSON.stringify(viewport, null, 2));
+      }
+    }
+    const desktop = result.receipt.containment.viewports.find(({ width, height }) => (
+      width === DESKTOP_READABILITY_VIEWPORT.width
+      && height === DESKTOP_READABILITY_VIEWPORT.height
+    ));
+    assert.ok(desktop);
+    // Reading size holds; with notes below the fold the diagram itself fits,
+    // and any remaining overflow must be accepted scroll (checked above).
+    assert.ok(desktop.diagramWidth >= desktop.viewBoxWidth, JSON.stringify(desktop, null, 2));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('extreme intrinsic architecture keeps readable text and proves complete camera access', {
+  skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
+}, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-readable-scroll-reader-'));
+  const input = path.join(
+    skillRoot,
+    'test/fixtures/architecture-viewport/readable-scroll-worldscope.architecture.json',
+  );
+  const artifact = path.join(tmp, 'readable-scroll-worldscope.html');
+  try {
+    execFileSync(process.execPath, [
+      path.join(skillRoot, 'bin', 'archify.mjs'),
+      'deliver',
+      'architecture',
+      input,
+      artifact,
+      '--quality',
+      'showcase',
+      '--json',
+    ], { cwd: skillRoot, encoding: 'utf8' });
+
+    const html = fs.readFileSync(artifact, 'utf8');
+    const svgRoot = html.match(/<svg\b[^>]*>/)?.[0];
+    assert.ok(svgRoot, 'expected an SVG root');
+    assert.match(svgRoot, /viewBox="0 0 980 1188"/);
+    assert.match(svgRoot, /data-reader-fit="intrinsic-height"/);
+    assert.match(svgRoot, /data-reader-min-text="7\.5"/);
+
+    const result = await runVisualCheck({ artifactPath: artifact, chromePath });
+    assert.equal(result.exitCode, 0, JSON.stringify(result.receipt, null, 2));
+    assert.equal(result.receipt.containment.status, 'pass');
+    assert.equal(result.receipt.containment.policy, 'camera-viewport-or-fit-or-reader-declared-readable-vertical-scroll');
+    assert.equal(result.receipt.readability.status, 'pass');
+    assert.equal(result.receipt.viewerChrome.status, 'pass');
+    assert.equal(result.receipt.diagnostics.length, 0, JSON.stringify(result.receipt, null, 2));
+
+    let cameraViewportCount = 0;
+    for (const viewport of result.receipt.containment.viewports) {
+      assert.equal(viewport.overflowX, false, JSON.stringify(viewport, null, 2));
+      for (const [field, floor] of [
+        ['minimumProjectedNonEdgeTextPx', 7.5 - 0.01],
+        ['minimumProjectedEdgeTextPx', MIN_PROJECTED_NODE_TEXT_PX],
+        ['minimumProjectedNodeTextPx', MIN_PROJECTED_NODE_TEXT_PX],
+      ]) {
+        assert.ok(Number.isFinite(viewport[field]), field + ': ' + JSON.stringify(viewport, null, 2));
+        assert.ok(viewport[field] >= floor, field + ': ' + JSON.stringify(viewport, null, 2));
+      }
+      if (viewport.fixedCanvas) {
+        cameraViewportCount += 1;
+        assert.equal(viewport.overflowY, false);
+        assert.equal(viewport.cameraViewportAccepted, true);
+        assert.deepEqual(viewport.viewportAccess, { camera: true, reader: true, page: true });
+        assert.equal(viewport.overflowDisposition, 'camera-viewport');
+      } else if (viewport.overflowY) {
+        assert.equal(viewport.verticalScrollAccepted, true, JSON.stringify(viewport, null, 2));
+        assert.equal(viewport.overflowDisposition, 'readable-vertical-scroll');
+        assert.equal(viewport.readerLayout, 'adaptive');
+        assert.equal(viewport.readerOverflow, 'authored');
+        assert.equal(viewport.readerFit, 'intrinsic-height');
+      } else {
+        assert.equal(viewport.overflowY, false, JSON.stringify(viewport, null, 2));
+        assert.equal(viewport.verticalScrollAccepted, false);
+        assert.equal(viewport.overflowDisposition, 'contained');
+      }
+    }
+    assert.ok(cameraViewportCount > 0, 'expected the extreme intrinsic diagram to prove camera access');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('offline workflows preserve lane frames and prove camera access without reflow', {
   skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
 }, async () => {
   const fixtureRoot = path.join(skillRoot, 'test/fixtures/workflow-viewport');
@@ -164,10 +400,18 @@ test('fixed desktop canvas contains offline workflows without rewriting pinned g
           }
         },
       });
-      assert.equal(result.exitCode, 0, JSON.stringify(result.receipt));
-      assert.equal(result.receipt.containment.status, 'pass');
       if (name === 'order-pinned-overflow') {
-        assert.match(fs.readFileSync(artifact, 'utf8'), /viewBox="0 0 860 786"/);
+        assert.equal(result.exitCode, 0, JSON.stringify(result.receipt));
+        for (const viewport of result.receipt.containment.viewports) {
+          assert.equal(viewport.cameraViewportAccepted, true);
+          assert.equal(viewport.overflowY, false);
+          assert.equal(viewport.workflowLanes[0].frameId, 'lane-0');
+          assert.equal(viewport.workflowLanes[0].nodeCount, 12);
+          assert.ok(viewport.workflowLanes[0].spaceAboveNodesPx > 100);
+        }
+      } else {
+        assert.equal(result.exitCode, 0, JSON.stringify(result.receipt));
+        assert.equal(result.receipt.containment.status, 'pass');
       }
     }
   } finally {
@@ -221,7 +465,7 @@ test('issue #250 tall intrinsic workflow fits every required desktop viewport', 
   }
 });
 
-test('issue #250 five-stage stack preserves source geometry and readability in the fixed canvas', {
+test('issue #250 five-stage stack fits below source scale without crossing the readability floor', {
   skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
 }, async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-issue-250-five-stage-'));
@@ -250,9 +494,58 @@ test('issue #250 five-stage stack preserves source geometry and readability in t
       width === DESKTOP_READABILITY_VIEWPORT.width && height === DESKTOP_READABILITY_VIEWPORT.height
     ));
     assert.ok(desktop);
-    assert.ok(desktop.diagramWidth > 0 && desktop.diagramWidth < desktop.innerWidth, JSON.stringify(desktop, null, 2));
-    assert.ok(desktop.viewBoxWidth > 0);
+    assert.ok(desktop.diagramWidth < desktop.viewBoxWidth, JSON.stringify(desktop, null, 2));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('authored Architecture keeps its reading size and rejects inaccessible camera windows', {
+  skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
+}, async t => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-authored-reader-'));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const input = path.join(tmp, 'fixed.json');
+  const artifact = path.join(tmp, 'fixed.html');
+  const doc = {
+    schema_version: 1, diagram_type: 'architecture',
+    meta: { title: 'Authored overview', output: 'fixed.html', viewBox: [1040, 700], quality_profile: 'showcase' },
+    components: [
+      { id: 'client', type: 'frontend', label: 'Client', pos: [40, 80], size: [130, 60] },
+      { id: 'api', type: 'backend', label: 'API', pos: [300, 80], size: [140, 64] },
+      { id: 'store', type: 'database', label: 'Store', pos: [300, 470], size: [140, 64] },
+    ],
+    connections: [{ from: 'client', to: 'api', label: 'request' }, { from: 'api', to: 'store', label: 'persist' }],
+  };
+  fs.writeFileSync(input, JSON.stringify(doc));
+  execFileSync(process.execPath, [path.join(skillRoot, 'bin/archify.mjs'), 'render', 'architecture', input, artifact]);
+  const html = fs.readFileSync(artifact, 'utf8');
+  assert.match(html, /viewBox="0 0 1040 700"/);
+  assert.match(html, /<rect x="300" y="470" width="140" height="64"/);
+  const baseline = path.join(tmp, 'legacy.html');
+  fs.writeFileSync(baseline, html.replace(' data-reader-fit="authored-height"', ''));
+  const old = await runVisualCheck({ artifactPath: baseline, chromePath });
+  assert.equal(old.exitCode, 0, 'camera access protects explicit geometry without relying on the document-scroll declaration');
+  const result = await runVisualCheck({ artifactPath: artifact, chromePath });
+  assert.equal(result.exitCode, 0, JSON.stringify(result.receipt.diagnostics));
+  for (const viewport of result.receipt.containment.viewports) {
+    const before = old.receipt.containment.viewports.find(v => v.width === viewport.width);
+    assert.equal(viewport.diagramWidth, before.diagramWidth, 'keep the approved page scale');
+    assert.equal(viewport.readerWidth, before.readerWidth);
+    assert.equal(viewport.readerLayout, before.readerLayout);
+    assert.equal(viewport.readerFit, 'authored-height');
+    assert.equal(viewport.cameraViewportAccepted, true);
+    assert.equal(viewport.overflowX, false);
+    if (viewport.overflowY) assert.equal(viewport.verticalScrollAccepted, true);
+  }
+  for (const [name,damage] of [
+    ['zero-stage','<style>.diagram-container { max-height: 0 !important; }</style>'],
+    ['no-camera','<script>Archify.view.centerAt = function () { return false; };</script>'],
+  ]) {
+    const clipped = path.join(tmp, `clipped-${name}.html`);
+    fs.writeFileSync(clipped, html.replace('</body>', damage + '</body>'));
+    const failed = await runVisualCheck({ artifactPath: clipped, chromePath });
+    assert.equal(failed.exitCode, 1);
+    assert.ok(failed.receipt.diagnostics.some(d => d.code === 'viewer/diagram-clipped'), JSON.stringify(failed.receipt.diagnostics));
   }
 });

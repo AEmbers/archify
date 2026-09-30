@@ -176,7 +176,9 @@ test('cli: help lists commands and diagram types', () => {
   assert.match(result.stdout, /archify render <type>/);
   assert.match(result.stdout, /archify compare architecture <base\.json> <head\.json>/);
   assert.match(result.stdout, /archify deliver <type>/);
+  assert.match(result.stdout, /archify finalize <type>/);
   assert.match(result.stdout, /archify preview <type>/);
+  assert.match(result.stdout, /archify browser-check <output\.html>/);
   assert.match(result.stdout, /archify visual-check <output\.html>/);
   assert.match(result.stdout, /--open/);
   assert.match(result.stdout, /archify validate <type> <input\.json> .*\[--repo-root path\]/);
@@ -196,6 +198,7 @@ test('cli: doctor reports a complete installation is ready', () => {
   assert.match(result.stdout, /\[ok\] Live preview runtime/);
   assert.match(result.stdout, /\[ok\] Atomic output safety runtime/);
   assert.match(result.stdout, /\[ok\] Sidecar path naming runtime/);
+  assert.match(result.stdout, /\[ok\] Finalize runtime/);
   assert.match(result.stdout, /\[ok\] Scenario recipe guide/);
   assert.match(result.stdout, /\[ok\] Progressive authoring references/);
   assert.match(result.stdout, /\[ok\] Architecture compare runtime and proof fixtures/);
@@ -330,7 +333,7 @@ test('cli: guide returns repair steps, via semantics, and viewport checks as JSO
   assert.match(prompt, /absolute.*\[x, y\]/);
   assert.match(prompt, /1440×900.*1600×1000.*1920×1080.*2048×1320/);
   assert.match(prompt, /scrollWidth <= window\.innerWidth/);
-  assert.match(prompt, /scrollHeight <= window\.innerHeight/);
+  assert.match(prompt, /Reader-declared readable vertical page scroll/);
   assert.match(prompt, /validate.*diagnostics\[\].*supportedFixes/);
 });
 
@@ -344,7 +347,7 @@ test('cli: guide prints localized repair advice, including an explicit language 
     assert.match(result.stdout, /推荐: 布局修复/);
     assert.match(result.stdout, /schema.*重叠.*方向.*交叉.*标签/s);
     assert.match(result.stdout, /\[start, \.\.\.via, end\]/);
-    assert.match(result.stdout, /scrollHeight <= window\.innerHeight/);
+    assert.match(result.stdout, /Reader 已达到投影文字下限并接受可读的页面纵向滚动/);
     assert.match(result.stdout, /validate/);
   }
 });
@@ -399,13 +402,93 @@ test('cli: visual-check returns a skipped receipt with exit 2 when Chrome is una
     env: { ...process.env, ARCHIFY_CHROME: missingChrome },
   });
 
-  assert.equal(result.status, 2, result.stderr);
+  assert.equal(result.status, 2, result.stderr || result.stdout);
   const receipt = JSON.parse(result.stdout);
   assert.equal(receipt.status, 'skipped');
   assert.equal(receipt.evidenceKind, 'automated-browser');
   assert.equal(receipt.visualReview, 'pending');
   assert.equal(receipt.chrome.status, 'unavailable');
   assert.equal(fs.existsSync(out.replace(/\.html$/, '.visual-check.json')), true);
+});
+
+test('cli: browser-check returns deterministic evidence without requesting perceptual review', () => {
+  const out = path.join(tmp, 'browser-check-skipped.html');
+  fs.writeFileSync(out, '<!doctype html><html><body>delivered</body></html>');
+  const missingChrome = path.join(tmp, 'missing-browser-check-chrome');
+  const result = run(['browser-check', out, '--json'], {
+    env: { ...process.env, ARCHIFY_CHROME: missingChrome },
+  });
+
+  assert.equal(result.status, 2, result.stderr || result.stdout);
+  const receipt = JSON.parse(result.stdout);
+  assert.equal(receipt.command, 'browser-check');
+  assert.equal(receipt.status, 'skipped');
+  assert.equal(receipt.evidenceKind, 'automated-browser');
+  assert.equal(receipt.visualReview, 'not-requested');
+  assert.equal(receipt.captures.status, 'not-requested');
+  assert.equal(receipt.chrome.status, 'unavailable');
+  assert.equal(fs.existsSync(out.replace(/\.html$/, '.browser-check.json')), true);
+  assert.equal(fs.existsSync(out.replace(/\.html$/, '.browser-check.contact.png')), false);
+});
+
+test('cli: finalize emits one compact receipt and keeps complete stage evidence in its sidecar', () => {
+  const input = path.join(skillRoot, 'examples/web-app.architecture.json');
+  const out = path.join(tmp, 'finalize-skipped.html');
+  const outDir = path.join(tmp, 'finalize-skipped-evidence');
+  const missingChrome = path.join(tmp, 'missing-finalize-chrome');
+  const result = run([
+    'finalize', 'architecture', input, out,
+    '--quality', 'showcase', '--json', '--out-dir', outDir,
+  ], { env: { ...process.env, ARCHIFY_CHROME: missingChrome } });
+
+  assert.equal(result.status, 2, result.stderr || result.stdout);
+  assert.equal(result.stdout.trim().split('\n').length, 1, 'agent stdout stays compact');
+  const summary = JSON.parse(result.stdout);
+  assert.equal(summary.status, 'skipped');
+  assert.equal(summary.failedStage, 'browser-check');
+  assert.deepEqual(summary.gates, {
+    validate: 'pass', deliver: 'pass', check: 'pass', 'browser-check': 'skipped',
+  });
+  assert.equal(summary.visualReview, 'not-requested');
+  assert.equal(summary.evidence.receipt, path.join(outDir, 'finalize-skipped.finalize.json'));
+  assert.equal(summary.evidence.summaryReceipt, path.join(outDir, 'finalize-skipped.finalize-summary.json'));
+  assert.equal(summary.evidence.browserCheckReceipt, path.join(outDir, 'finalize-skipped.browser-check.json'));
+  const full = JSON.parse(fs.readFileSync(summary.evidence.receipt, 'utf8'));
+  assert.equal(full.stages.validate.receipt.validation.checkCount, 9);
+  assert.equal(full.stages['browser-check'].receipt.status, 'skipped');
+  const persistedSummary = JSON.parse(fs.readFileSync(summary.evidence.summaryReceipt, 'utf8'));
+  assert.deepEqual(persistedSummary, summary);
+  assert.equal('stages' in persistedSummary, false);
+  assert.equal(fs.existsSync(out), true, 'verified delivery remains available when browser evidence is skipped');
+});
+
+test('cli: visual-check summary preserves skipped and failed evidence without claiming image review', () => {
+  const out = path.join(tmp, 'visual-summary.html');
+  fs.writeFileSync(out, '<!doctype html><html><body>delivered</body></html>');
+  const outDir = path.join(tmp, 'visual-summary-evidence');
+  const result = run(['visual-check', out, '--summary', '--out-dir', outDir], {
+    env: { ...process.env, ARCHIFY_CHROME: path.join(tmp, 'summary-missing-chrome') },
+  });
+  assert.equal(result.status, 2, result.stderr || result.stdout);
+  assert.equal(result.stdout.trim().split('\n').length, 1);
+  const summary = JSON.parse(result.stdout);
+  assert.equal(summary.status, 'skipped');
+  assert.equal(summary.visualReview, 'pending');
+  assert.deepEqual(summary.evidence.screenshots, []);
+  const full = JSON.parse(fs.readFileSync(summary.evidence.receipt, 'utf8'));
+  assert.deepEqual(summary.artifact, full.artifact);
+  assert.deepEqual(summary.diagnostics, full.diagnostics);
+  assert.equal(summary.checks.containment, full.containment.status);
+  assert.equal(summary.evidence.receipt, path.join(outDir, 'visual-summary.visual-check.json'));
+
+  const failure = run(['visual-check', path.join(tmp, 'summary-missing.html'), '--summary']);
+  assert.equal(failure.status, 1);
+  const failedSummary = JSON.parse(failure.stdout);
+  assert.equal(failedSummary.status, 'fail');
+  assert.equal(failedSummary.visualReview, 'pending');
+  assert.ok(failedSummary.diagnostics.length > 0);
+  assert.deepEqual(failedSummary.evidence.screenshots, []);
+  assert.equal(failedSummary.evidence.receipt, undefined, 'an unpublished receipt must not be linked');
 });
 
 test('cli: visual-check --out-dir writes the receipt into that directory, not beside the artifact', () => {
@@ -417,7 +500,7 @@ test('cli: visual-check --out-dir writes the receipt into that directory, not be
     env: { ...process.env, ARCHIFY_CHROME: missingChrome },
   });
 
-  assert.equal(result.status, 2, result.stderr);
+  assert.equal(result.status, 2, result.stderr || result.stdout);
   const receipt = JSON.parse(result.stdout);
   assert.equal(receipt.status, 'skipped');
   assert.equal(fs.existsSync(path.join(outDir, 'visual-check-outdir.visual-check.json')), true);
@@ -492,7 +575,7 @@ test('cli: visual-check describes human output as automated browser evidence, no
     env: { ...process.env, ARCHIFY_CHROME: missingChrome },
   });
 
-  assert.equal(result.status, 2, result.stderr);
+  assert.equal(result.status, 2, result.stderr || result.stdout);
   assert.match(result.stdout, /automated browser evidence skipped:/i);
   assert.match(result.stdout, /perceptual visual review pending/i);
   assert.doesNotMatch(result.stdout, /^visual-check skipped:/m);
@@ -577,8 +660,10 @@ test('cli: opener failure does not invalidate a verified delivery or pollute jso
   const receipt = JSON.parse(result.stdout);
   assert.equal(receipt.ok, true);
   assert.equal(receipt.open.status, 'failed');
+  assert.equal(receipt.open.failure.code, 'opener/nonzero-exit');
   assert.equal(receipt.open.target, fs.realpathSync.native(out));
   assert.match(result.stderr, /Could not open the verified artifact/);
+  assert.match(result.stderr, /exited with status 17\. Open the target manually\./);
   assert.match(result.stderr, new RegExp(out.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.equal(fs.existsSync(out), true);
   assert.equal(receipt.artifact.sha256, sha256(out));
@@ -833,6 +918,20 @@ test('cli: a later successful delivery replaces stale provenance with an artifac
   const mismatch = JSON.parse(checked.stdout);
   assert.equal(mismatch.provenance, 'mismatch');
   assert.equal(mismatch.diagnostics[0].code, 'delivery/provenance-mismatch');
+});
+
+test('cli: check accepts --json and emits the receipt', () => {
+  const input = path.join(skillRoot, 'examples/agent-tool-call.workflow.json');
+  const out = path.join(tmp, 'check-json-flag.html');
+
+  const delivered = run(['deliver', 'workflow', input, out, '--json']);
+  assert.equal(delivered.status, 0, delivered.stderr);
+
+  const checked = run(['check', out, '--json']);
+  assert.equal(checked.status, 0, checked.stderr);
+  const receipt = JSON.parse(checked.stdout);
+  assert.equal(receipt.ok, true);
+  assert.equal(receipt.provenance, 'current');
 });
 
 test('cli: delivery pair rollback restores the previous HTML and marks it stale', () => {
@@ -3850,9 +3949,9 @@ test('cli: check rejects unknown options and extra positionals', () => {
   const input = path.join(skillRoot, 'examples/agent-tool-call.workflow.json');
   assert.equal(run(['render', 'workflow', input, out]).status, 0);
 
-  const unknown = run(['check', '--json', out]);
+  const unknown = run(['check', '--strict-json', out]);
   assert.equal(unknown.status, 2);
-  assert.match(unknown.stderr, /Unknown check option "--json"/);
+  assert.match(unknown.stderr, /Unknown check option "--strict-json"/);
 
   const strict = run(['check', '--require-provenance', out]);
   assert.equal(strict.status, 1);

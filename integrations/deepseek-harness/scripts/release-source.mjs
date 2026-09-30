@@ -62,6 +62,17 @@ if (!/^[a-f0-9]{40}$/.test(release.sourceCommit)) {
   throw new Error('DSH release sourceCommit must be a full immutable Git commit');
 }
 
+// Only an exact SemVer may pin the runtime: ranges, tags, registry aliases,
+// URLs, and local paths would let the committed release file substitute an
+// arbitrary package for @deepseek-ai/dsh.
+const EXACT_SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*)?(?:\+[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?$/;
+if (typeof release.dshVersion !== 'string' || !EXACT_SEMVER.test(release.dshVersion)) {
+  throw new Error(`DSH release dshVersion must be an exact SemVer version: ${JSON.stringify(release.dshVersion)}`);
+}
+if (Object.keys(manifest.scripts || {}).length > 0) {
+  throw new Error(`DSH adapter manifest must not declare npm scripts: ${Object.keys(manifest.scripts).join(', ')}`);
+}
+
 export function releaseSnapshot(destination) {
   // A separate checkout gives the canonical stager a real index, preserves Git
   // modes, and cannot include uncommitted or untracked files from the caller.

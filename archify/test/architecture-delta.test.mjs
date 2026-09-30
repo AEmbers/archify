@@ -201,6 +201,35 @@ test('compare reports brand-only changes in the receipt and exact review target'
   }
 });
 
+test('compare reports icon-only changes in the receipt and exact review target', () => {
+  const base = {
+    schema_version: 1,
+    diagram_type: 'architecture',
+    meta: { title: 'Cache', output: 'cache.html' },
+    components: [{ id: 'cache', type: 'database', label: 'Cache', pos: [100, 100], size: [160, 80] }],
+  };
+  const basePath = path.join(tmp, 'icon-base.json');
+  const headPath = path.join(tmp, 'icon-head.json');
+  const output = path.join(tmp, 'icon-delta.html');
+  for (const [before, after] of [[undefined, 'clock'], ['clock', 'moon'], ['moon', 'none'], ['none', undefined]]) {
+    const head = structuredClone(base);
+    base.components[0].icon = before;
+    head.components[0].icon = after;
+    fs.writeFileSync(basePath, JSON.stringify(base));
+    fs.writeFileSync(headPath, JSON.stringify(head));
+
+    const result = run(['compare', 'architecture', basePath, headPath, output, '--json']);
+    assert.equal(result.status, 0, result.stderr);
+    const receipt = JSON.parse(result.stdout);
+    assert.equal(receipt.summary.components.changed, 1);
+    assert.deepEqual(receipt.changes.components[0].classifications, ['semantic']);
+    assert.deepEqual(receipt.changes.components[0].changedFields, ['/icon']);
+    const html = fs.readFileSync(output, 'utf8');
+    assert.match(html, /data-change-key="component:cache"/);
+    assert.deepEqual(validateArchitectureDeltaHtml(html, receipt), { ok: true, checksPassed: 10, checkCount: 10 });
+  }
+});
+
 test('compare reports locale-only changes as presentation changes', () => {
   const head = read(baseFixture);
   head.meta.locale = 'zh-CN';

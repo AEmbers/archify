@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { test } from 'node:test';
 
-import { ChromeVisualBrowser } from '../bin/visual-check.mjs';
+import { ChromeVisualBrowser, CHROME_STARTUP_TIMEOUT_MS } from '../bin/visual-check.mjs';
 
 function chromeChild() {
   const child = new EventEmitter();
@@ -34,13 +34,13 @@ function browserFor(child) {
 test('Chrome first-command timeout reports the running process, pipe progress and stderr', async (t) => {
   const setTimeout = globalThis.setTimeout;
   t.mock.method(globalThis, 'setTimeout', (callback, delay, ...args) =>
-    setTimeout(callback, delay === 15000 ? 5 : delay, ...args));
+    setTimeout(callback, delay === CHROME_STARTUP_TIMEOUT_MS ? 5 : delay, ...args));
   const child = chromeChild();
   const browser = browserFor(child);
   child.stderr.write('Browser initialization is waiting for a service\n');
   try {
     await assert.rejects(browser.sessionPromise, (error) => {
-      assert.match(error.message, /Target\.getTargets: timed out after 15000ms/);
+      assert.match(error.message, new RegExp(`Target\\.getTargets: timed out after ${CHROME_STARTUP_TIMEOUT_MS}ms`));
       assert.match(error.message, /Chrome process: still running/);
       assert.match(error.message, /pid=7321/);
       assert.match(error.message, /Node v\d+.*libuv/);
@@ -110,3 +110,18 @@ for (const [options, expectedTimeout] of [[{}, 45_000], [{ pageLoadTimeoutMs: 12
     }
   });
 }
+test('Chrome close releases inherited process pipes after the main process exits', async () => {
+  const child = chromeChild();
+  const browser = browserFor(child);
+  child.exitCode = 0;
+  child.emit('exit', 0, null);
+  const session = assert.rejects(browser.sessionPromise, /visual-check finished/);
+  const first = browser.close();
+  const second = browser.close();
+  assert.strictEqual(second, first);
+  await first;
+  await session;
+  assert.equal(child.stderr.destroyed, true);
+  assert.equal(child.stdio[3].destroyed, true);
+  assert.equal(child.stdio[4].destroyed, true);
+});

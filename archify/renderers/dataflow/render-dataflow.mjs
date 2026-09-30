@@ -429,7 +429,7 @@ function renderNode(node) {
   if (hasSub) textRows.push({ text: node.sublabel, font: sublabelFontSize, y: 37 });
   if (node.tag) textRows.push({ text: node.tag, font: tagFontSize, y: node.height - 11 });
   const labelLayout = nodeLabelLayout({ width: node.width, height: node.height, rows: textRows,
-    brand: Boolean(brandMarkFor(node)) });
+    brand: Boolean(brandMarkFor(node)), source: Boolean(sourceEvidence?.nodes?.[node.id]?.length) });
   const sub = hasSub
     ? `\n          <text data-detail="context" x="${node.cx}" y="${node.y + labelLayout.ys[1]}" class="t-muted" font-size="${sublabelFontSize}" text-anchor="middle">${esc(node.sublabel)}</text>`
     : '';
@@ -446,7 +446,7 @@ function renderNode(node) {
           ${focusNodeTitle(node.label, passport)}
           <rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="6" class="c-mask"/>
           <rect x="${node.x}" y="${node.y}" width="${node.width}" height="${node.height}" rx="6" class="${fill}"${animateAttr(dataflow.meta, 'node', nodeSteps.get(node.id))} stroke-width="1.5"/>
-          ${renderSemanticSigil(node.type, { x: node.x + 6, y: node.y + labelLayout.sigilY, size: labelLayout.sigilSize })}${brand ? `\n          ${brand}` : ''}
+          ${renderSemanticSigil(node.type, { icon: node.icon, x: node.x + 6, y: node.y + labelLayout.sigilY, size: labelLayout.sigilSize })}${brand ? `\n          ${brand}` : ''}
           <text data-node-label=""${hasSub ? ' data-detail-anchor=""' : ''} x="${node.x + labelLayout.x}" y="${node.y + labelLayout.ys[0]}" class="t-primary" font-size="${labelFontSize}" font-weight="600" text-anchor="middle">${esc(node.label)}</text>${sub}${tag}
         </g>`;
 }
@@ -504,7 +504,11 @@ function renderLegend() {
 }
 
 function renderSvg() {
-  return `      <svg viewBox="0 0 ${viewBox[0]} ${viewBox[1]}" ${svgRootAttrs(dataflow.meta)}>
+  // Same default-canvas contract as lifecycle: 940x720 is below the 1.55 wide
+  // ratio, so without intrinsic-height the desktop Reader can neither narrow
+  // nor scroll it and every default dataflow fails the browser gate.
+  const readerFit = dataflow.meta?.viewBox ? '' : ' data-reader-fit="intrinsic-height"';
+  return `      <svg viewBox="0 0 ${viewBox[0]} ${viewBox[1]}"${readerFit} ${svgRootAttrs(dataflow.meta)}>
 ${svgAccessibleText(dataflow.meta, 'dataflow')}
 ${renderDefinitions()}
 

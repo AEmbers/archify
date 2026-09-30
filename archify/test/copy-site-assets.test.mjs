@@ -409,7 +409,12 @@ test('copySiteAssets atomically refreshes regular assets and leaves no temporary
     if (previousUmask !== undefined) process.umask(previousUmask);
   }
 
-  for (const asset of ['site-language.js', 'site-navigation.css']) {
+  for (const asset of [
+    'site-language.js',
+    'site-navigation.css',
+    'archify-lockup-light.svg',
+    'archify-mark.svg',
+  ]) {
     assert.deepEqual(
       fs.readFileSync(path.join(assets, asset)),
       fs.readFileSync(path.join(canonicalAssets, asset)),
@@ -418,5 +423,10 @@ test('copySiteAssets atomically refreshes regular assets and leaves no temporary
   if (process.platform !== 'win32') {
     assert.equal(fs.statSync(existing).mode & 0o777, 0o666);
   }
-  assert.deepEqual(fs.readdirSync(assets).sort(), ['site-language.js', 'site-navigation.css']);
+  assert.deepEqual(fs.readdirSync(assets).sort(), [
+    'archify-lockup-light.svg',
+    'archify-mark.svg',
+    'site-language.js',
+    'site-navigation.css',
+  ]);
 });

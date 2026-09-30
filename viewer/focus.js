@@ -179,9 +179,6 @@
         }
         var result = reachabilityFor(activeIds[0], direction);
         if (!result || result.nodeIds.length <= 1) return false;
-        if (Archify.guidedViews && typeof Archify.guidedViews.showAll === 'function') {
-          Archify.guidedViews.showAll({ clearFocus: false, updateUrl: false, resetView: false });
-        }
         clearRelationshipPreview({ clearPin: true });
         clearReachability({ updateUrl: false });
         reachabilityMode = direction;
@@ -754,11 +751,9 @@
           html.getAttribute('data-guide-open') === 'true' ||
           container.classList.contains('is-panning') ||
           (activeIds.length > 0 && !pinnedRelationshipKey) ||
-          svg.hasAttribute('data-story-active') ||
           svg.hasAttribute('data-route-picking') ||
           svg.hasAttribute('data-route-active') ||
-          svg.hasAttribute('data-lens-active') ||
-          svg.hasAttribute('data-chapter-preview');
+          svg.hasAttribute('data-lens-active');
       }
       function scheduleDirectRelationshipPreview(target) {
         if (directPreviewTimer) window.clearTimeout(directPreviewTimer);
@@ -797,9 +792,6 @@
         }
         var record = relationshipRecordForKey(key);
         if (!record) return false;
-        if (Archify.guidedViews && typeof Archify.guidedViews.showAll === 'function') {
-          Archify.guidedViews.showAll({ clearFocus: false, updateUrl: false });
-        }
         set(record.from, { toggle: false, updateUrl: false });
         var row = Array.prototype.slice.call(relationshipList.querySelectorAll('[data-relationship-key]')).find(function (candidate) {
           return candidate.getAttribute('data-relationship-key') === key;
@@ -1377,7 +1369,7 @@
         svg.setAttribute('data-focus-active', normalized.join(' '));
         var defaultLabel = normalized.length === 1
           ? nodeLabel(byId[normalized[0]], normalized[0])
-          : viewerText('viewer.guided.chapter.selectedNodes', { count: normalized.length });
+          : viewerText('viewer.focus.selectedNodes', { count: normalized.length });
         label.textContent = options.label || defaultLabel;
         chip.hidden = options.hideChip === true || normalized.length !== 1 || selectionMode;
         if (!chip.hidden) {
@@ -1485,9 +1477,6 @@
         var button = event.target.closest('[data-relationship-target]');
         if (!button) return;
         var id = button.getAttribute('data-relationship-target');
-        if (Archify.guidedViews && typeof Archify.guidedViews.showAll === 'function') {
-          Archify.guidedViews.showAll({ clearFocus: false, updateUrl: false });
-        }
         set(id, { toggle: false });
         if (Archify.view && typeof Archify.view.reveal === 'function') {
           Archify.view.reveal([id], { includeNeighbors: true, reason: 'relationship' });
@@ -1573,8 +1562,7 @@
 
       installRelationshipHitTargets();
 
-      function syncFocusFromHash(options) {
-        options = options || {};
+      function syncFocusFromHash() {
         try {
           var params = new URLSearchParams(location.hash.replace(/^#/, ''));
           var relation = params.get('relation');
@@ -1582,7 +1570,7 @@
           var reach = params.get('reach');
           if (relation) {
             if (html.getAttribute('data-embed') === 'true' ||
-                !inspectRelationshipById(relation, { updateUrl: false, toggle: false })) clear({ updateUrl: false, preserveView: options.preserveView === true });
+                !inspectRelationshipById(relation, { updateUrl: false, toggle: false })) clear({ updateUrl: false });
           }
           else if (initial) {
             if (set(initial, { updateUrl: false, toggle: false }) &&
@@ -1590,12 +1578,12 @@
               applyReachability(reach, { updateUrl: false, toggle: false, reveal: false });
             }
           }
-          else if (!params.get('view')) clear({ updateUrl: false, preserveView: options.preserveView === true });
+          else clear({ updateUrl: false });
         } catch (_) {}
       }
 
       window.addEventListener('hashchange', syncFocusFromHash);
-      syncFocusFromHash({ preserveView: true });
+      syncFocusFromHash();
 
       return {
         set: set,
