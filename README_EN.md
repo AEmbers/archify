@@ -40,7 +40,7 @@
   <a href="https://x.com/t20000622yy"><img src="https://img.shields.io/badge/Creator_on_X-181717?style=for-the-badge&amp;logo=x&amp;logoColor=white" alt="Follow the creator on X" /></a>
 </p>
 
-<p align="center"><a href="#sponsors"><strong>❤️ Partners & sponsors: Kimi Work · Supercode</strong></a></p>
+<p align="center"><a href="#sponsors"><strong>❤️ Partners & sponsors: Kimi Work · Supercode · OpenLux · EverMind/Raven</strong></a></p>
 
 ## See Archify in action
 
@@ -87,6 +87,10 @@ Then continue: “Add authentication”, “Highlight the cache-miss path”, or
 <tr>
   <td align="center" width="240"><a href="https://supercode.sh/?utm_source=archify"><img src="https://cdn.supercode.sh/sponsors/supercode-logo.png" alt="Supercode" width="200"/></a><br/><strong><a href="https://supercode.sh/?utm_source=archify">supercode.sh</a></strong></td>
 <td><a href="https://supercode.sh/?utm_source=archify">Supercode</a> sponsors Archify and enhances Codex and Cursor with token optimization, curated Skills, and spec-driven development. Archify is featured as a <a href="https://supercode.sh/en/skills/tt-a1i/archify/archify">Supercode Editor’s Choice</a> skill.<br/><br/><a href="https://supercode.sh/en/skills/tt-a1i/archify/archify"><img src="https://supercode.sh/badges/editors-choice.svg" alt="Supercode Editor’s Choice — Archify" width="240" height="55"/></a></td>
+</tr>
+<tr>
+<td align="center" width="240"><a href="https://www.openlux.ai/register?channel=c_qdvanbpc"><img src="docs/assets/sponsors/openlux-logo.png" alt="OpenLux" width="200" /></a><br/><strong><a href="https://www.openlux.ai/register?channel=c_qdvanbpc">OpenLux</a></strong></td>
+<td>Thank you to OpenLux for sponsoring this project! OpenLux is an all-in-one AI platform for businesses, bringing together leading AI models from major providers worldwide. With fast, reliable service and responsive technical support, OpenLux offers base pricing for Claude, OpenAI, and Gemini models as low as 8.82%, 4%, and 8% of official rates, respectively.<br/><br/>Exclusive offer for Archify users: Sign up through our referral link and enjoy up to 7.5% off credit top-ups!<br/><br/><a href="https://www.openlux.ai/register?channel=c_qdvanbpc">Get started with OpenLux →</a></td>
 </tr>
 <tr><td align="center" width="240"><a href="https://github.com/EverMind-AI/Raven"><img src="docs/assets/sponsors/evermind-archify-raven.png" alt="Archify × Raven" width="200" /></a><br/><strong><a href="https://github.com/EverMind-AI">EverMind</a> · <a href="https://github.com/EverMind-AI/Raven">Raven</a></strong></td><td>EverMind sponsors Archify and builds memory infrastructure for agents. Its <a href="https://github.com/EverMind-AI/Raven"><strong>Raven</strong></a> harness supports Archify as a Skill for verified, interactive system maps.</td></tr>
 </table>

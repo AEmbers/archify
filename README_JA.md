@@ -78,6 +78,10 @@ the API checks Redis, and a cache miss queries PostgreSQL and fills the cache.
   <td align="center" width="240"><a href="https://supercode.sh/?utm_source=archify"><img src="https://cdn.supercode.sh/sponsors/supercode-logo.png" alt="Supercode" width="200"/></a><br/><strong><a href="https://supercode.sh/?utm_source=archify">supercode.sh</a></strong></td>
 <td><a href="https://supercode.sh/?utm_source=archify">Supercode</a> は Archify をスポンサーし、トークン最適化・厳選された Skills・仕様駆動開発によって Codex と Cursor を強化しています。Archify は <a href="https://supercode.sh/en/skills/tt-a1i/archify/archify">Supercode Editor’s Choice</a> スキルに選出されています。<br/><br/><a href="https://supercode.sh/en/skills/tt-a1i/archify/archify"><img src="https://supercode.sh/badges/editors-choice.svg" alt="Supercode Editor’s Choice — Archify" width="240" height="55"/></a></td>
 </tr>
+<tr>
+<td align="center" width="240"><a href="https://www.openlux.ai/register?channel=c_qdvanbpc"><img src="docs/assets/sponsors/openlux-logo.png" alt="OpenLux" width="200" /></a><br/><strong><a href="https://www.openlux.ai/register?channel=c_qdvanbpc">OpenLux</a></strong></td>
+<td>OpenLux による本プロジェクトへのスポンサー支援に感謝します！OpenLux は、世界の主要プロバイダーの AI モデルを集約した企業向けのオールインワン AI プラットフォームです。高速で安定したサービスと迅速な技術サポートを提供し、Claude、OpenAI、Gemini シリーズの基本料金は、それぞれ公式料金の 8.82%、4%、8% から利用できます。<br/><br/>Archify ユーザー限定特典：専用リンクから登録すると、クレジットのチャージが最大 7.5% 割引になります！<br/><br/><a href="https://www.openlux.ai/register?channel=c_qdvanbpc">OpenLux を試す →</a></td>
+</tr>
 <tr><td align="center" width="240"><a href="https://github.com/EverMind-AI/Raven"><img src="docs/assets/sponsors/evermind-archify-raven.png" alt="Archify × Raven" width="200" /></a><br/><strong><a href="https://github.com/EverMind-AI">EverMind</a> · <a href="https://github.com/EverMind-AI/Raven">Raven</a></strong></td><td>EverMind は Archify をスポンサーし、エージェント向けのメモリ基盤を開発しています。同社の <a href="https://github.com/EverMind-AI/Raven"><strong>Raven</strong></a> ハーネスは、検証済みでインタラクティブなシステムマップのために Archify を Skill としてサポートしています。</td></tr>
 </table>
 
