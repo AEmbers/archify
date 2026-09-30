@@ -103,6 +103,48 @@ test('Infinite canvas preserves dev reading and progressive detail', {
       }
     }
   });
+  await t.test('Map follows dev zoom visibility while infinite pan remains available at 100%', async () => {
+    const visible = () => run(`getComputedStyle(document.getElementById('btn-overview-map')).display !== 'none'`);
+    for (const mode of Object.keys(cases)) {
+      await load(mode, { reduced: true });
+      assert.equal(await visible(), false, mode + ': hidden at initial 100%');
+      if (mode === 'architecture') {
+        const point = await run(`(() => { const r = document.querySelector('.diagram-container').getBoundingClientRect(); return {x:r.left+12,y:r.top+12}; })()`);
+        const before = await run('Archify.view.state()');
+        await send('Input.dispatchMouseEvent', { type:'mouseMoved', ...point });
+        await send('Input.dispatchMouseEvent', { type:'mousePressed', ...point, button:'middle', clickCount:1 });
+        await send('Input.dispatchMouseEvent', { type:'mouseMoved', x:point.x+40,y:point.y+20,button:'middle',buttons:4 });
+        await send('Input.dispatchMouseEvent', { type:'mouseReleased', x:point.x+40,y:point.y+20,button:'middle',clickCount:1 });
+        await stable();
+        const after = await run('Archify.view.state()');
+        assert.ok(after.x > before.x + 10, 'native drag still pans at 100%');
+        assert.equal(after.scale, 1);
+        assert.equal(await visible(), false, 'pan does not reveal Map');
+      }
+      for (const [scale, expected] of [[.75,false],[.9999,false],[1,false],[1.0001,true],[1.25,true],[1,false]]) {
+        await run(`Archify.view.zoomAt(${scale},500,300)`); await stable();
+        assert.equal(await visible(), expected, mode + ': Map at ' + scale);
+      }
+      await run('Archify.view.zoomIn()'); await stable();
+      assert.equal(await visible(), true);
+      await run('Archify.view.reset()'); await stable();
+      assert.equal(await visible(), false, mode + ': Reset hides Map');
+      for (const [scale, expected] of [[1.01,true],[1,false]]) {
+        await run(`Archify.view.zoomAt(${scale},500,300,{manual:false,defer:true})`); await stable();
+        assert.equal(await visible(), expected, mode + ': continuous zoom at ' + scale);
+      }
+    }
+    await load('architecture', { reduced: true });
+    await run(`document.querySelector('.diagram-container').focus()`);
+    for (const type of ['keyDown','keyUp']) await send('Input.dispatchKeyEvent',{type,key:'m',code:'KeyM',windowsVirtualKeyCode:77});
+    await stable();
+    assert.equal(await run('Archify.radar.isOpen()'), true, 'M still opens Map at 100%');
+    assert.equal(await visible(), true, 'explicitly opened Map retains its control');
+    await run('Archify.radar.close({restoreFocus:true})'); await stable();
+    assert.equal(await visible(), true, 'closing retains the focused trigger');
+    await run(`document.querySelector('.diagram-container').focus()`); await stable();
+    assert.equal(await visible(), false, 'Map hides after focus leaves the closed trigger');
+  });
   await t.test('original notes and index controls switch bottom, right and collapsed layouts', async () => {
     await load('architecture', { width: 1920, height: 1080, reduced: true });
     assert.equal(await run(`Boolean(document.getElementById('reader-rail'))`), true);

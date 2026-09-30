@@ -849,6 +849,8 @@ scale is capped at 4. `worldViewport` is unbounded; `logicalViewport` reports
 its intersection with authored bounds and an `outside` marker for Radar.
 Layout changes preserve a manual view's effective SVG scale and world center.
 Fit mode tracks the resized stage; semantic mode retains dev caller behavior.
+Map keeps dev dock visibility: hidden at or below 100%, shown above 100%, or
+while explicitly requested or focused. This does not gate infinite canvas input.
 
 Canvas wheel and direct-pointer gestures, Space-drag and focused arrow keys
 own only diagram input. Controls, text inputs, the reader rail and draggable

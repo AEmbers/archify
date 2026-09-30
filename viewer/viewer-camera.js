@@ -285,6 +285,7 @@
         options = options || {};
         if (options.interactive !== true) refreshGeometry();
         boundCamera();
+        container.classList.toggle('is-zoomed', state.scale > 1);
         svg.style.transform = 'translate(' + state.x + 'px,' + state.y + 'px) scale(' + state.scale + ')';
         var offsetLeft = options.interactive === true ? interactionMetrics.offsetLeft : (svg.offsetLeft || 0);
         var offsetTop = options.interactive === true ? interactionMetrics.offsetTop : (svg.offsetTop || 0);
@@ -303,7 +304,6 @@
         fitAllBtn.hidden = !directNavigationEnabled();
         fitAllBtn.disabled = !canvasGeometry || !canvasGeometry.fit;
         inBtn.disabled = state.scale >= MAX_SCALE;
-        container.classList.toggle('is-pannable', directNavigationEnabled());
         svg.setAttribute('data-view-scale', String(state.scale));
         if (Archify.radar && typeof Archify.radar.sync === 'function') Archify.radar.sync();
         if (Archify.viewerChromeLayout && typeof Archify.viewerChromeLayout.schedule === 'function') {
