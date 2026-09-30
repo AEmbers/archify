@@ -736,7 +736,9 @@ test('Radar reflects camera viewport, status and Focus activity through normal c
     }
     const initial = await observe(`window.scrollTo(0, document.querySelector('.diagram-container').offsetTop); Archify.radar.open();`);
     assert.deepEqual(initial.actual, initial.expected);
-    assert.equal(initial.status, initial.count + ' nodes · full map');
+    // Original reading size now shows a viewport into the larger world.
+    // Explicit Fit all below must still switch the status to the full map.
+    assert.equal(initial.status, initial.count + ' nodes · ' + Math.round(initial.scale * 100) + '% viewport');
     const fitted = await observe('Archify.view.fitAll();');
     assert.deepEqual(fitted.actual, fitted.expected);
     assert.equal(fitted.status, fitted.count + ' nodes · full map');

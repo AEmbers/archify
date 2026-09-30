@@ -447,6 +447,7 @@
       function toggle() { return setOpen(!requestedOpen, { focus: false }); }
       function close(options) { return setOpen(false, options); }
       function bringNodeIntoWindow(node) {
+        if (document.documentElement.hasAttribute('data-fixed-canvas')) return;
         var delay = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 540;
         window.setTimeout(function () {
           var rect = node.getBoundingClientRect();

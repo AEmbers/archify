@@ -4777,3 +4777,45 @@ html[data-preset="classic"] .diagram-container { background: var(--panel); }
 html[data-preset="classic"] .infinite-canvas-grid {
   background-image: radial-gradient(circle at 1px 1px, var(--canvas-dot) 1px, transparent 1.4px);
 }
+
+/* The desktop world keeps its reading size inside a bounded viewport. Notes
+   own their scrolling; the root page never becomes a second navigation axis. */
+@media screen and (min-width: 721px) {
+  html[data-fixed-canvas], html[data-fixed-canvas] body { height: 100dvh; overflow: hidden; }
+  html[data-fixed-canvas] .container {
+    display: grid;
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  html[data-fixed-canvas] .header { grid-column: 1 / -1; grid-row: 1; min-width: 0; }
+  html[data-fixed-canvas] .diagram-container {
+    grid-column: 1; grid-row: 2; align-self: stretch; min-width: 0; min-height: 0;
+    /* Focus must not create a second scroll position behind the camera. */
+    overflow: clip;
+  }
+  html[data-fixed-canvas][data-reader-rail="bottom"] .container {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  html[data-fixed-canvas][data-reader-rail="bottom"] .reader-rail {
+    grid-column: 1 / -1; grid-row: 3;
+    min-height: 0; max-height: min(28dvh, 18rem);
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  html[data-fixed-canvas][data-reader-rail="true"] .container {
+    grid-template-columns: minmax(0, 1fr) var(--archify-rail-width);
+  }
+  html[data-fixed-canvas][data-reader-rail="true"] .reader-rail {
+    grid-column: 2; grid-row: 2; max-height: 100%;
+  }
+  html[data-fixed-canvas] .reader-rail,
+  html[data-fixed-canvas] .reader-rail .cards,
+  html[data-fixed-canvas] .reader-rail .node-outline-list { overscroll-behavior: contain; }
+}
+
+@media print {
+  .reader-rail { display: contents !important; }
+  .node-outline:not([hidden]) { display: block; margin-top: 1rem; }
+  .node-outline-list { overflow: visible; max-height: none; mask-image: none; }
+}

@@ -492,3 +492,18 @@ test('the authored grid scales continuously with the camera and pan writes only 
     assert.ok(Math.abs(parseFloat(f.container.style['--archify-grid-y']) - parseFloat(before['--archify-grid-y']) - 71) < .01);
   }
 });
+
+test('layout compensation preserves reading above the relative input cap without reversing zoom-in', () => {
+  const f=cameraFixture({svgWidth:1200,svgHeight:800,width:1440,height:900});
+  f.view.zoomAt(3,400,300);
+  const before=f.view.worldViewport();
+  f.sizeSvg(400,800/3);f.resize(721,800);
+  const compensated=f.state().scale;
+  assert.ok(compensated>4,'shrinking the CSS reading basis requires relative compensation');
+  const after=f.view.worldViewport();
+  assert.ok(Math.abs(before.x+before.width/2-after.x-after.width/2)<1e-6);
+  assert.ok(Math.abs(before.y+before.height/2-after.y-after.height/2)<1e-6);
+  f.view.zoomIn();assert.equal(f.state().scale,compensated,'zoom-in at a restored cap must not zoom out');
+  f.view.zoomOut();assert.ok(f.state().scale<compensated);
+  f.view.reset();f.view.zoomAt(999,400,300);assert.equal(f.state().scale,4,'ordinary input still caps at 400%');
+});

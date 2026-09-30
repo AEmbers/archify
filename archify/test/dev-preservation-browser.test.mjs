@@ -164,12 +164,24 @@ test('Infinite canvas preserves dev reading and progressive detail', {
     assert.equal(await run(`document.getElementById('reader-rail').textContent`), content);
   });
   await t.test('switching the reader rail retains the manual reading point and text scale', async () => {
+    await run(`localStorage.setItem('archify-rail-placement','bottom');localStorage.setItem('archify-rail-collapsed','0')`);
     await load('architecture', { width: 1920, height: 1080, reduced: true });
     await run(`Archify.view.zoomAt(2, 500, 300);Archify.view.panBy(50, -40)`); await stable();
     const reading = `(() => { const v = Archify.view.worldViewport(), svg = document.querySelector('.diagram-container > svg'); return { x:v.x+v.width/2, y:v.y+v.height/2, font:parseFloat(getComputedStyle(svg.querySelector('text[data-node-label]')).fontSize)*svg.getScreenCTM().a }; })()`;
     const before = await run(reading);
     await run(`document.getElementById('rail-placement').click()`); await stable();
-    const after = await run(reading);
-    for (const key of ['x','y','font']) assert.ok(Math.abs(after[key]-before[key]) < 1, JSON.stringify({before,after,key}));
+    async function retained() {
+      const after = await run(reading);
+      for (const key of ['x','y','font']) assert.ok(Math.abs(after[key]-before[key]) < 1, JSON.stringify({before,after,key}));
+      assert.ok(await run('document.scrollingElement.scrollHeight<=innerHeight+1'));
+      assert.deepEqual(await run('({x:scrollX,y:scrollY})'),{x:0,y:0});
+    }
+    await retained();
+    await run(`document.getElementById('rail-collapse').click()`);await stable();await retained();
+    await run(`document.getElementById('rail-reveal').click()`);await stable();await retained();
+    await run(`document.getElementById('rail-placement').click()`);await stable();await retained();
+    for(const [width,height] of [[1440,900],[1024,600],[721,800],[1920,1080]]) {
+      await viewport(width,height);await stable();await retained();
+    }
   });
 });

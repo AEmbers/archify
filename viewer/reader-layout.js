@@ -120,10 +120,15 @@
         // hierarchy rather than enlarging every other node to compensate.
         return labelWidth(declaredPrimaryText);
       }
+      function fixedCanvas() {
+        return Boolean(shell && diagram && svg && window.innerWidth > 720 &&
+          html.getAttribute('data-embed') !== 'true' && html.getAttribute('data-present') !== 'true' &&
+          (!window.matchMedia || !window.matchMedia('print').matches));
+      }
       function eligible() {
         return Boolean(
-          shell && diagram && svg && (ratio >= WIDE_RATIO || measuredHeightFit) &&
-          window.innerWidth >= MIN_DESKTOP_WIDTH &&
+          shell && diagram && svg && (fixedCanvas() || ((ratio >= WIDE_RATIO || measuredHeightFit) &&
+          window.innerWidth >= MIN_DESKTOP_WIDTH)) &&
           html.getAttribute('data-embed') !== 'true' &&
           html.getAttribute('data-present') !== 'true' &&
           (!window.matchMedia || !window.matchMedia('print').matches)
@@ -177,7 +182,7 @@
       // so the index uses that space instead of scrolling inside the diagram's
       // height; it never pushes the page into overflow.
       function fitDockedRail() {
-        if (html.getAttribute('data-reader-rail') !== 'true' || !railPanel) return;
+        if (fixedCanvas() || html.getAttribute('data-reader-rail') !== 'true' || !railPanel) return;
         var top = railPanel.getBoundingClientRect().top + window.scrollY;
         var floor = window.innerHeight - number(window.getComputedStyle(body).paddingBottom) - top;
         html.style.setProperty('--archify-rail-max', Math.max(diagram.getBoundingClientRect().height, floor) + 'px');
@@ -220,7 +225,7 @@
         if (settleFrame) cancelAnimationFrame(settleFrame);
         settleFrame = requestAnimationFrame(function () {
           settleFrame = 0;
-          if (!eligible() || !lastWidth) return;
+          if (fixedCanvas() || !eligible() || !lastWidth) return;
           fitDockedRail();
           var overflow = Math.max(
             document.documentElement.scrollHeight,
@@ -239,6 +244,7 @@
       }
       function measure() {
         frame = 0;
+        html.toggleAttribute('data-fixed-canvas', fixedCanvas());
         if (!eligible()) {
           clear();
           return null;
@@ -293,6 +299,12 @@
         var availableSvgHeight = Math.max(1, window.innerHeight - fixedHeight);
         var desiredWidth = availableSvgHeight * ratio + chrome.diagramX + (docked ? railExtra : 0);
         var width = Math.max(minWidth, Math.min(maxWidth, desiredWidth, settledCap || desiredWidth));
+        // Newly bounded non-adaptive readers retain their original CSS reading
+        // width. The viewport clips the world; it never shrinks text to fit.
+        if (fixedCanvas() && (window.innerWidth < MIN_DESKTOP_WIDTH || (ratio < WIDE_RATIO && !measuredHeightFit))) {
+          width = Math.min(1440, viewportCap);
+        }
+        if (fixedCanvas()) html.removeAttribute('data-reader-overflow');
         applyWidth(width, minWidth);
         settleOverflow(minWidth);
         return {
@@ -339,6 +351,10 @@
         schedule();
       }, { passive: true });
       window.addEventListener('load', schedule, { once: true });
+      window.addEventListener('beforeprint', measure);
+      window.addEventListener('afterprint', schedule);
+      var printMedia = window.matchMedia && window.matchMedia('print');
+      if (printMedia && printMedia.addEventListener) printMedia.addEventListener('change', schedule);
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule).catch(function () {});
       if (typeof ResizeObserver === 'function') {
         var resizeObserver = new ResizeObserver(schedule);

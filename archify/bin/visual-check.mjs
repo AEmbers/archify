@@ -1633,6 +1633,73 @@ export class ChromeVisualBrowser {
       });
     })()`, true);
 
+    // A bounded interactive world must prove access, rather than treating any
+    // hidden SVG overflow as acceptable. Exercise the public camera and reader
+    // on this temporary browser page, then restore its initial reading state.
+    const viewportAccess = await evaluate(this.cdp, sessionId, `(function () {
+      var html = document.documentElement;
+      if (!html.hasAttribute('data-fixed-canvas')) return null;
+      var diagram = document.querySelector('.diagram-container');
+      var svg = diagram && diagram.querySelector(':scope > svg');
+      var view = window.Archify && Archify.view;
+      var result = { camera: false, reader: false, page: false };
+      if (!svg || !view || typeof view.centerAt !== 'function' || typeof view.reset !== 'function') return result;
+      var viewport = diagram.getBoundingClientRect();
+      var box = svg.viewBox.baseVal;
+      var style = getComputedStyle(diagram);
+      var left = viewport.left + diagram.clientLeft + (parseFloat(style.paddingLeft) || 0);
+      var top = viewport.top + diagram.clientTop + (parseFloat(style.paddingTop) || 0);
+      var right = viewport.left + diagram.clientLeft + diagram.clientWidth - (parseFloat(style.paddingRight) || 0);
+      var bottom = viewport.top + diagram.clientTop + diagram.clientHeight - (parseFloat(style.paddingBottom) || 0);
+      var bounded = viewport.left >= 0 && viewport.top >= 0 && viewport.right <= innerWidth + 1 && viewport.bottom <= innerHeight + 1
+        && left >= 0 && top >= 0 && right <= innerWidth + 1 && bottom <= innerHeight + 1
+        && right - left >= 32 && bottom - top >= 32;
+      var authoredWorld = Array.from(svg.querySelectorAll('[data-node-id]')).every(function(node) {
+        var bounds = node.getBBox();
+        var matrix = svg.getScreenCTM().inverse().multiply(node.getScreenCTM());
+        return [[bounds.x,bounds.y],[bounds.x+bounds.width,bounds.y+bounds.height]].every(function(point) {
+          var p = new DOMPoint(point[0],point[1]).matrixTransform(matrix);
+          return p.x >= box.x - 1 && p.x <= box.x + box.width + 1 && p.y >= box.y - 1 && p.y <= box.y + box.height + 1;
+        });
+      });
+      var points = [[box.x,box.y],[box.x+box.width,box.y],[box.x,box.y+box.height],[box.x+box.width,box.y+box.height]];
+      try {
+        result.camera = bounded && authoredWorld && points.every(function (point) {
+          if (!view.centerAt(point[0],point[1],{preserveScale:true,instant:true})) return false;
+          var p = new DOMPoint(point[0],point[1]).matrixTransform(svg.getScreenCTM());
+          return p.x >= left - 1 && p.x <= right + 1 && p.y >= top - 1 && p.y <= bottom + 1;
+        });
+      } finally { view.reset(); }
+      var rail = document.getElementById('reader-rail');
+      var shown = rail && !rail.hidden && getComputedStyle(rail).display !== 'none';
+      var scrolls = shown ? [rail].concat(Array.from(rail.querySelectorAll('*')).filter(function (e) {
+        return e.clientHeight > 0 && e.scrollHeight > e.clientHeight;
+      })).map(function(e) { return {e:e,top:e.scrollTop,left:e.scrollLeft}; }) : [];
+      result.reader = !shown || ['.card li','.node-outline-item'].every(function(selector) {
+        var entries = rail.querySelectorAll(selector);
+        var last = entries[entries.length-1];
+        if (!last) return true;
+        for (var ancestor=last.parentElement; ancestor && ancestor !== document.body; ancestor=ancestor.parentElement) {
+          if (ancestor.scrollHeight > ancestor.clientHeight + 1 && ['hidden','clip'].includes(getComputedStyle(ancestor).overflowY)) return false;
+        }
+        last.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});
+        var r = last.getBoundingClientRect(), visible = r.width > 0 && r.height > 0;
+        for (var p = last.parentElement; p && p !== document.body; p = p.parentElement) {
+          var css = getComputedStyle(p);
+          if (css.overflowY === 'visible' && css.overflowX === 'visible') continue;
+          var clip = p.getBoundingClientRect();
+          visible = visible && r.top >= clip.top - 1 && r.bottom <= clip.bottom + 1
+            && r.left >= clip.left - 1 && r.right <= clip.right + 1;
+        }
+        return visible && r.top >= 0 && r.bottom <= innerHeight + 1;
+      });
+      scrolls.forEach(function(saved) { saved.e.scrollTop=saved.top; saved.e.scrollLeft=saved.left; });
+      window.scrollTo(500,500);
+      result.page = scrollX === 0 && scrollY === 0;
+      window.scrollTo(0,0);
+      return result;
+    })()`);
+
     const metrics = await evaluate(this.cdp, sessionId, `(function () {
       var reader = document.querySelector('.container');
       var diagram = document.querySelector('.diagram-container');
@@ -1742,7 +1809,8 @@ export class ChromeVisualBrowser {
       var bodyStyle = window.getComputedStyle(document.body);
       var diagramStyle = diagram ? window.getComputedStyle(diagram) : null;
       var svgHeight = svg ? svg.getBoundingClientRect().height : 0;
-      var notesBelowFold = Boolean(reader) && document.documentElement.getAttribute('data-reader-rail') === 'bottom';
+      var fixedCanvas = document.documentElement.hasAttribute('data-fixed-canvas');
+      var notesBelowFold = !fixedCanvas && Boolean(reader) && document.documentElement.getAttribute('data-reader-rail') === 'bottom';
       var pageComposition = {
         bodyPaddingPx: Math.round((parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0)),
         headerPx: Math.round(outerHeight(reader && reader.querySelector('.header'))),
@@ -1798,6 +1866,10 @@ export class ChromeVisualBrowser {
         viewerChromeActive: viewerChromeReceipt ? viewerChromeReceipt.active : false
       };
     })()`);
+    if (metrics) {
+      metrics.fixedCanvas = viewportAccess !== null;
+      metrics.viewportAccess = viewportAccess;
+    }
     if (!metrics || !Number.isFinite(metrics.scrollWidth) || !Number.isFinite(metrics.scrollHeight)) {
       throw new Error('Chrome returned incomplete containment metrics.');
     }
@@ -1881,8 +1953,11 @@ function observation({ width, height, theme, metrics }) {
   const readerLayout = metrics.readerLayout || null;
   const readerOverflow = metrics.readerOverflow || null;
   const readerFit = metrics.readerFit || null;
+  const fixedCanvas = metrics.fixedCanvas === true;
+  const cameraViewportAccepted = fixedCanvas && metrics.viewportAccess?.camera === true
+    && metrics.viewportAccess?.reader === true && metrics.viewportAccess?.page === true;
   const verticalScrollAccepted = Boolean(
-    overflowY
+    !fixedCanvas && overflowY
     && !overflowX
     && readabilityOk
     && Number.isFinite(minimumProjectedNodeTextPx)
@@ -1890,8 +1965,8 @@ function observation({ width, height, theme, metrics }) {
       || (readerFit === 'authored-height' && metrics.diagramType === 'architecture'
         && metrics.documentScrollUnclipped === true))
   );
-  const authoredClipped = readerFit === 'authored-height' && metrics.diagramType === 'architecture'
-    && metrics.documentScrollUnclipped !== true;
+  const authoredClipped = fixedCanvas ? !cameraViewportAccepted
+    : readerFit === 'authored-height' && metrics.diagramType === 'architecture' && metrics.documentScrollUnclipped !== true;
   const containmentOk = !authoredClipped && !overflowX && (!overflowY || verticalScrollAccepted);
   const legendDockIntersectionArea = Number(metrics.legendDockIntersectionArea) || 0;
   const dockStageIntersectionArea = Number(metrics.dockStageIntersectionArea) || 0;
@@ -1917,9 +1992,12 @@ function observation({ width, height, theme, metrics }) {
     overflowX,
     overflowY,
     verticalScrollAccepted,
+    fixedCanvas,
+    cameraViewportAccepted,
+    ...(fixedCanvas ? { viewportAccess: metrics.viewportAccess } : {}),
     overflowDisposition: authoredClipped || overflowX || (overflowY && !verticalScrollAccepted)
       ? 'unexpected-overflow'
-      : verticalScrollAccepted ? 'readable-vertical-scroll' : 'contained',
+      : fixedCanvas && cameraViewportAccepted ? 'camera-viewport' : verticalScrollAccepted ? 'readable-vertical-scroll' : 'contained',
     readerLayout,
     readerOverflow,
     readerFit,
@@ -2104,15 +2182,19 @@ function observationDiagnostics({ artifact, allObservations, readabilityObservat
       }));
     }
     if (!entry.ok) {
-      const authoredClipped = entry.readerFit === 'authored-height' && entry.diagramType === 'architecture'
-        && !entry.documentScrollUnclipped;
+      const authoredClipped = entry.fixedCanvas ? !entry.cameraViewportAccepted
+        : entry.readerFit === 'authored-height' && entry.diagramType === 'architecture' && !entry.documentScrollUnclipped;
       const budgetFixes = authoredClipped
-        ? ['restore the full SVG inside the diagram panel and allow normal document scrolling; remove internal scrollers and clipping without changing authored geometry']
+        ? entry.fixedCanvas
+          ? ['restore camera access to the entire world and local scrolling access to the last notes/index entries without overflowing the page']
+          : ['restore the full SVG inside the diagram panel and allow normal document scrolling; remove internal scrollers and clipping without changing authored geometry']
         : verticalBudgetFixes(entry);
       diagnostics.push(failureDiagnostic({
         code: authoredClipped ? 'viewer/diagram-clipped' : 'viewer/viewport-overflow',
         message: authoredClipped
-          ? `The authored Architecture canvas is clipped or cannot scroll in the document at ${entry.width}x${entry.height} (${entry.theme}).`
+          ? entry.fixedCanvas
+            ? `The fixed canvas cannot reach its world or reader content at ${entry.width}x${entry.height} (${entry.theme}).`
+            : `The authored Architecture canvas is clipped or cannot scroll in the document at ${entry.width}x${entry.height} (${entry.theme}).`
           : `The rendered artifact overflows the ${entry.width}x${entry.height} ${entry.theme} viewport.`,
         subject: viewportSubject(artifact, entry),
         evidence: {
@@ -2219,7 +2301,7 @@ function baseReceipt({ artifactPath, artifact, sidecars, chrome, deliveryProvena
     diagnostics: [],
     containment: {
       status: 'fail',
-      policy: 'fit-or-reader-declared-readable-vertical-scroll',
+      policy: 'camera-viewport-or-fit-or-reader-declared-readable-vertical-scroll',
       viewports: [],
     },
     themeStates: { status: 'fail', viewports: [] },
@@ -2326,7 +2408,7 @@ function persistBrowserEvidenceFailure(
     } : {}),
     containment: {
       status: 'fail',
-      policy: 'fit-or-reader-declared-readable-vertical-scroll',
+      policy: 'camera-viewport-or-fit-or-reader-declared-readable-vertical-scroll',
       viewports: [],
     },
     captures: { status: capture ? 'fail' : 'not-requested', screenshots: [], contactSheet: null },

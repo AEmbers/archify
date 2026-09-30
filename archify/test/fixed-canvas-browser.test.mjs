@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { findChrome } from '../bin/visual-check.mjs';
+import { findChrome, runVisualCheck } from '../bin/visual-check.mjs';
 import { desktopBrowser } from './helpers/desktop-browser.mjs';
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -95,6 +95,55 @@ test('Infinite canvas retains original reader content, input ownership and speci
     const image=await send('Page.captureScreenshot',{format:'png'});
     fs.writeFileSync(path.join(evidence,name+'.png'),Buffer.from(image.data,'base64'));
   }
+  await t.test('desktop viewport bounds the page while complete explanations remain scrollable', async () => {
+    await load(fixtures.find(f => f.name === 'long-notes'), 1440, 900);
+    const bounds = await run(`(() => { const p=document.scrollingElement; return {
+      x:p.scrollWidth-p.clientWidth,y:p.scrollHeight-p.clientHeight
+    }; })()`);
+    assert.ok(bounds.x <= 1 && bounds.y <= 1, JSON.stringify(bounds));
+    await run('window.scrollTo(500,500)');
+    assert.deepEqual(await run('({x:scrollX,y:scrollY})'), {x:0,y:0});
+    const before = await run('Archify.view.state()');
+    const rail = await run(`(() => { const r=document.getElementById('reader-rail').getBoundingClientRect();
+      return {x:r.left+30,y:r.top+30}; })()`);
+    await send('Input.dispatchMouseEvent',{type:'mouseWheel',...rail,deltaY:50000,deltaX:0});
+    await run('new Promise(r=>setTimeout(r,150))');
+    const end = await run(`(() => { const rail=document.getElementById('reader-rail'),
+      last=[...rail.querySelectorAll('.card li')].at(-1),r=rail.getBoundingClientRect(),e=last.getBoundingClientRect();
+      return {scroll:rail.scrollTop,visible:e.top>=r.top&&e.bottom<=r.bottom}; })()`);
+    assert.ok(end.scroll > 0 && end.visible, JSON.stringify(end));
+    assert.deepEqual(await run('Archify.view.state()'),before);
+    assert.deepEqual(await run('({x:scrollX,y:scrollY})'),{x:0,y:0});
+    await run(`document.querySelector('.node-outline-item').focus()`);
+    for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+    const indexed=await run(`(() => {const last=[...document.querySelectorAll('.node-outline-item')].at(-1),
+      r=last.getBoundingClientRect(),p=document.getElementById('reader-rail').getBoundingClientRect();
+      return {focused:document.activeElement===last,visible:r.top>=p.top&&r.bottom<=p.bottom};})()`);
+    assert.deepEqual(indexed,{focused:true,visible:true});
+    assert.deepEqual(await run('Archify.view.state()'),before);
+    assert.deepEqual(await run('({x:scrollX,y:scrollY})'),{x:0,y:0});
+  });
+  await t.test('the final item in a 300-node index is reachable by native wheel and Tab without moving the camera', async () => {
+    const file=path.join(scratch,'long-index.html');
+    execFileSync(process.execPath,[path.join(skillRoot,'bin/archify.mjs'),'render','workflow',
+      path.resolve(skillRoot,'../benchmarks/hybrid-large-world-viewer-pilot/corpus/workflow-300.workflow.json'),file]);
+    await load({file},1920,1080);
+    await run(`document.getElementById('rail-placement').click()`);await stable();
+    const before=await run('Archify.view.state()');
+    const index=await run(`(()=>{const list=document.querySelector('.node-outline-list'),r=list.getBoundingClientRect();
+      return {count:list.querySelectorAll('.node-outline-item').length,x:r.left+20,y:r.top+20};})()`);
+    assert.equal(index.count,300);
+    await send('Input.dispatchMouseEvent',{type:'mouseWheel',x:index.x,y:index.y,deltaY:50000,deltaX:0});
+    await run('new Promise(r=>setTimeout(r,150))');
+    await run(`(()=>{const items=[...document.querySelectorAll('.node-outline-item')];items.at(-2).focus({preventScroll:true});})()`);
+    for(const type of ['keyDown','keyUp'])await send('Input.dispatchKeyEvent',{type,key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+    const end=await run(`(()=>{const list=document.querySelector('.node-outline-list'),last=[...list.querySelectorAll('.node-outline-item')].at(-1),
+      r=last.getBoundingClientRect(),p=list.getBoundingClientRect();return {focused:document.activeElement===last,
+      visible:r.top>=p.top-1&&r.bottom<=p.bottom+1&&r.bottom<=innerHeight,scrolled:list.scrollTop>0};})()`);
+    assert.deepEqual(end,{focused:true,visible:true,scrolled:true});
+    assert.deepEqual(await run('Archify.view.state()'),before);
+    assert.deepEqual(await run('({x:scrollX,y:scrollY})'),{x:0,y:0});
+  });
   for (const fixture of fixtures) for (const [width,height] of [[1024,600],[1440,900],[2048,1320],[390,844]]) for (const theme of ['light','dark']) {
     await t.test(`${fixture.name}-${width}-${theme} retains complete content and default reading`, async () => {
       await load(fixture,width,height,theme);
@@ -103,14 +152,31 @@ test('Infinite canvas retains original reader content, input ownership and speci
         cards:document.querySelectorAll('.cards').length,rail:!!document.getElementById('reader-rail'),
         replacement:!!document.getElementById('btn-diagram-notes'),text:document.querySelector('.reader-rail').textContent,
         nodes:s.querySelectorAll('[data-node-id]').length,index:document.querySelectorAll('.node-outline-list [data-node-id]').length,
-        horizontal:document.scrollingElement.scrollWidth-innerWidth,errors:fixedCanvasErrors};})()`);
+        horizontal:document.scrollingElement.scrollWidth-innerWidth,vertical:document.scrollingElement.scrollHeight-innerHeight,errors:fixedCanvasErrors};})()`);
       assert.deepEqual(o.state,{scale:1,x:0,y:0,mode:'overview'});
       assert.equal(o.detail,'read');assert.equal(o.rail,true);assert.equal(o.replacement,false);
-      assert.equal(o.cards,1);assert.ok(o.nodes>0);assert.ok(o.horizontal<=1);assert.deepEqual(o.errors,[]);
+      assert.equal(o.cards,1);assert.ok(o.nodes>0);assert.ok(o.horizontal<=1);if(width>720)assert.ok(o.vertical<=1,JSON.stringify(o));assert.deepEqual(o.errors,[]);
       if(fixture.name==='long-notes')assert.match(o.text,/Explanation item 80/);
       records.push({fixture:fixture.name,width,height,theme,...o});await shot(fixture.name+'-'+width+'-'+theme);
     });
   }
+  await t.test('visual gate rejects hidden explanation overflow and a disabled camera',async()=>{
+    const fixture=fixtures.find(f=>f.name==='long-notes');
+    const original=fs.readFileSync(fixture.file,'utf8');
+    const good=await runVisualCheck({artifactPath:fixture.file,chromePath:chrome});
+    assert.equal(good.exitCode,0,JSON.stringify(good.receipt.diagnostics));
+    assert.ok(good.receipt.containment.viewports.every(v=>v.cameraViewportAccepted));
+    for(const [name,damage] of [
+      ['hidden-reader','<style>html[data-fixed-canvas] .reader-rail { overflow-y:hidden !important; }</style>'],
+      ['disabled-camera','<script>Archify.view.centerAt=function(){return false;};</script>'],
+    ]){
+      const damaged=path.join(scratch,name+'.html');
+      fs.writeFileSync(damaged,original.replace('</body>',damage+'</body>'));
+      const result=await runVisualCheck({artifactPath:damaged,chromePath:chrome});
+      assert.equal(result.exitCode,1,name);
+      assert.ok(result.receipt.diagnostics.some(d=>d.code==='viewer/diagram-clipped'),JSON.stringify(result.receipt.diagnostics));
+    }
+  });
   await t.test('sidebar native scroll, text editing, links and keyboard do not move the canvas',async()=>{
     await load(fixtures.find(f=>f.name==='long-notes'),1920,1080);
     await run(`localStorage.setItem('archify-rail-placement','right');localStorage.setItem('archify-rail-collapsed','0')`);
@@ -141,6 +207,9 @@ test('Infinite canvas retains original reader content, input ownership and speci
       await run(`document.getElementById('rail-reveal').click()`);await stable();
       assert.equal(await run(`document.getElementById('reader-rail').textContent`),original);
       assert.equal(await run(`document.querySelectorAll('.node-outline').length`),1);
+      assert.ok(await run(`(() => {const r=document.querySelector('.diagram-container').getBoundingClientRect();
+        return document.scrollingElement.scrollHeight<=innerHeight+1 && r.top>=0 && r.bottom<=innerHeight+1;})()`));
+      assert.deepEqual(await run('({x:scrollX,y:scrollY})'),{x:0,y:0});
     }
   });
   await t.test('all presets retain dev progressive detail and semantic hover reveal',async()=>{
@@ -159,8 +228,8 @@ test('Infinite canvas retains original reader content, input ownership and speci
     await load(fixtures.find(f=>f.name==='long-notes'));
     await run(`Archify.view.zoomAt(2,400,300);Archify.view.panBy(80,-150)`);await stable();
     await send('Emulation.setEmulatedMedia',{media:'print'});await stable();
-    const o=await run(`(()=>{const s=document.querySelector('.diagram-container > svg');return {cards:document.querySelector('.cards').getBoundingClientRect().height,text:document.querySelector('.cards').textContent,transform:getComputedStyle(s).transform,clip:getComputedStyle(s).clipPath,grid:getComputedStyle(document.querySelector('.infinite-canvas-grid')).display,hidden:[...s.querySelectorAll('[data-detail]')].some(e=>Number(getComputedStyle(e).opacity)!==1)};})()`);
-    assert.ok(o.cards>0);assert.match(o.text,/Explanation item 80/);assert.equal(o.transform,'none');assert.equal(o.clip,'none');assert.equal(o.grid,'none');assert.equal(o.hidden,false);
+    const o=await run(`(()=>{const s=document.querySelector('.diagram-container > svg');return {cards:document.querySelector('.cards').getBoundingClientRect().height,text:document.querySelector('.cards').textContent,transform:getComputedStyle(s).transform,clip:getComputedStyle(s).clipPath,grid:getComputedStyle(document.querySelector('.infinite-canvas-grid')).display,index:document.getElementById('node-outline').getBoundingClientRect().height,hidden:[...s.querySelectorAll('[data-detail]')].some(e=>Number(getComputedStyle(e).opacity)!==1)};})()`);
+    assert.ok(o.cards>0);assert.ok(o.index>0,'print retains the original node index');assert.match(o.text,/Explanation item 80/);assert.equal(o.transform,'none');assert.equal(o.clip,'none');assert.equal(o.grid,'none');assert.equal(o.hidden,false);
     if(evidence){const pdf=await send('Page.printToPDF',{printBackground:true});fs.writeFileSync(path.join(evidence,'reader-print.pdf'),Buffer.from(pdf.data,'base64'));}
     await send('Emulation.setEmulatedMedia',{media:''});
     for(const query of ['&embed=1','&present=1','&embed=1&present=1']){

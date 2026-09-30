@@ -593,7 +593,7 @@ test('live camera transitions keep authored relationship paint outside the Dock 
 
       assert.deepEqual(result.hits, [], `${scenario.name}: ${JSON.stringify(result.hits)}`);
       if (scenario.clearsClip) {
-        assert.equal(result.clipPath, '', `${scenario.name}: dev overview restores the authored stage`);
+        assert.match(result.clipPath, /^inset\(/, `${scenario.name}: bounded overview keeps authored paint outside the navigation reserve`);
       }
     }
   } finally {
@@ -953,8 +953,8 @@ test('Chrome Layout preserves scheduling, mode restoration and Reader handoffs',
         await resize(width);
         const current = await state(`threshold-${width}-${observations.length}`);
         assert.equal(current.geometry.receiptEligible, width > 720);
-        assert.equal(current.reader, width >= 1024 ? 'adaptive' : null);
-        assert.equal(current.fixed, false);
+        assert.equal(current.reader, width > 720 ? 'adaptive' : null);
+        assert.equal(current.fixed, width > 720);
         assert.equal(current.viewBox, initial.viewBox);
         if (width <= 720) zero(current);
         else clearStage(current);

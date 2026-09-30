@@ -82,6 +82,7 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
           active: Archify.readerLayout.active(), receipt: Archify.readerLayout.receipt(),
           width: html.style.getPropertyValue('--archify-reader-width'),
           layout: html.getAttribute('data-reader-layout'), overflow: html.getAttribute('data-reader-overflow'),
+          fixed: html.hasAttribute('data-fixed-canvas'),
           wide: diagram.getAttribute('data-wide-diagram'), shape: html.getAttribute('data-diagram-shape'),
           readerFit: svg.getAttribute('data-reader-fit'),
           geometry: ['viewBox', 'width', 'height'].map(function (name) { return svg.getAttribute(name); }),
@@ -140,7 +141,9 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
           const state = await snapshot(`${mode}-${theme}`);
           assert.equal(state.theme, theme);
           assert.equal(state.reduced, theme === 'light');
-          assert.equal(state.active, state.receipt.ratio >= 1.55);
+          assert.equal(state.active, true);
+          assert.equal(state.fixed, true);
+          assert.ok(state.scrollHeight <= state.innerHeight + 1);
           await evaluate('Archify.view.zoomIn()');
           await stable();
           const exported = await evaluate(`(async function () {
@@ -187,15 +190,18 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
         await load(variant(`ratio-${ratio}`, { ratio, undeclaredFit: true }));
         const before = await snapshot(`ratio-${ratio}`);
         assert.equal(before.readerFit, null, 'legacy ratio fixture declares no intrinsic fit');
-        assert.equal(before.active, ratio >= 1.55);
-        if (ratio < 1.55) inactive(before, false);
-        for (const width of [1023, 1024, 1025, 1023, 1440]) {
+        assert.equal(before.active, true);
+        assert.equal(before.fixed, true);
+        for (const width of [720, 721, 1023, 1024, 1025, 720, 1440]) {
           await viewport(width, 900);
           await stable();
           const state = await snapshot(`ratio-${ratio}-width-${width}`);
           assert.deepEqual(state.geometry, before.geometry);
-          if (ratio >= 1.55 && width >= 1024) assert.equal(state.active, true);
-          else inactive(state, ratio >= 1.55);
+          assert.equal(state.fixed, width > 720);
+          if (width > 720) {
+            assert.equal(state.active, true);
+            assert.ok(state.scrollHeight <= state.innerHeight + 1);
+          } else inactive(state, ratio >= 1.55);
         }
       }
     });
@@ -216,15 +222,20 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
       assert.equal((await snapshot('available-width-below-floor')).receipt.width, 824);
       await load(wide, { width: 1440, height: 300 });
       const geometry = (await snapshot('short-window')).geometry;
-      await evaluate(`document.querySelector('.header').style.minHeight = '1000px';
-        document.querySelector('.cards').innerHTML = '<div style="height:1200px">Long content</div>'`);
+      await evaluate(`document.querySelector('.cards').innerHTML = '<div class="card"><ul>' +
+        Array.from({length:80},(_,i)=>'<li'+(i===79?' id="reader-final-content"':'')+'>Long content '+(i+1)+'</li>').join('')+'</ul></div>'`);
       await stable();
       const overflow = await snapshot('long-content');
       // The summary rail moves cards beside the diagram, so its width joins the readable floor.
       const rail = await evaluate(`document.documentElement.getAttribute('data-reader-rail') === 'true'`);
       assert.equal(overflow.receipt.width, rail ? 960 + 288 + 20 : 960);
-      assert.equal(overflow.overflow, 'authored');
-      assert.ok(overflow.scrollHeight > overflow.innerHeight);
+      assert.equal(overflow.overflow, null);
+      assert.equal(overflow.fixed, true);
+      assert.ok(overflow.scrollHeight <= overflow.innerHeight + 1);
+      assert.equal(await evaluate(`(()=>{const end=document.getElementById('reader-final-content');
+        end.scrollIntoView({block:'nearest',behavior:'instant'});
+        const r=end.getBoundingClientRect(),rail=document.getElementById('reader-rail').getBoundingClientRect();
+        return r.top>=rail.top && r.bottom<=rail.bottom && scrollY===0;})()`), true, 'long reader content remains reachable');
       assert.deepEqual(overflow.geometry, geometry);
     });
 
@@ -282,7 +293,7 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
       ` });
       await load(file);
       assert.equal((await snapshot('optional-interfaces-absent')).active, true);
-      await viewport(1023, 900);
+      await viewport(720, 900);
       await stable();
       inactive(await snapshot('optional-resize-out'));
       await viewport(1440, 900);

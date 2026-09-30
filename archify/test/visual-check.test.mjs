@@ -2686,7 +2686,7 @@ test('visual-check accepts only Reader-declared readable vertical page scrolling
   assert.equal(result.exitCode, 0);
   assert.equal(result.receipt.status, 'pass');
   assert.equal(result.receipt.containment.status, 'pass');
-  assert.equal(result.receipt.containment.policy, 'fit-or-reader-declared-readable-vertical-scroll');
+  assert.equal(result.receipt.containment.policy, 'camera-viewport-or-fit-or-reader-declared-readable-vertical-scroll');
   const viewport = result.receipt.containment.viewports.find(({ width }) => width === 1440);
   assert.equal(viewport.overflowY, true);
   assert.equal(viewport.verticalScrollAccepted, true);
@@ -3189,5 +3189,28 @@ test('authored Architecture scroll requires readable unclipped document flow and
     assert.equal(result.exitCode, accepted ? 0 : 1, name);
     assert.equal(viewport.verticalScrollAccepted, accepted, name);
     assert.equal(viewport.readerLayout, null, 'the fixed canvas does not acquire adaptive scaling');
+  }
+});
+
+
+test('fixed viewport acceptance requires camera, reader and root access evidence', async () => {
+  const input=artifact('bounded-camera.html');
+  for(const [name,proof,overflow] of [
+    ['complete',{camera:true,reader:true,page:true},false],
+    ['camera-disabled',{camera:false,reader:true,page:true},false],
+    ['reader-clipped',{camera:true,reader:false,page:true},false],
+    ['page-moves',{camera:true,reader:true,page:false},false],
+    ['marker-alone',undefined,false],
+    ['page-overflow',{camera:true,reader:true,page:true},true],
+  ]){
+    const result=await runVisualCheck({artifactPath:input,chromePath:'/fake/chrome',
+      browserFactory:async()=>{const browser=fakeBrowser({tallAt:()=>overflow});
+        const inspect=browser.inspect;
+        browser.inspect=async options=>({...await inspect(options),fixedCanvas:true,viewportAccess:proof});
+        return browser;}});
+    assert.equal(result.exitCode,name==='complete'?0:1,name);
+    const viewport=result.receipt.containment.viewports[0];
+    assert.equal(viewport.ok,name==='complete',name);
+    if(name==='complete')assert.equal(viewport.overflowDisposition,'camera-viewport');
   }
 });

@@ -875,3 +875,27 @@ all presets and both themes, canonical exports, and specialized modes. See
 `fixed-canvas-browser.test.mjs` (reader integration cases), and
 `navigation-modes-browser.test.mjs`. The navigation reference was recorded from
 dev c6c74f1f using the same public actions and frozen architecture input.
+
+## Bounded desktop canvas
+
+Ordinary screen readers above 720 CSS px use a viewport-height shell. The
+original bottom cards/index, right rail and collapsed entry share that budget;
+long reading content scrolls inside its own region. The SVG keeps its reading
+size and authored viewBox, while the existing camera reaches the world beyond
+the visible area. Reader width and rail choice remain reader-layout's concern;
+CSS owns height allocation, and Camera owns the visible world and navigation.
+The bottom reader uses at most 28dvh (capped at 18rem), leaving the main area to
+the diagram. Camera clipping also protects the navigation reserve during motion.
+
+The root page must have no horizontal or vertical scroll range. Local reading
+scroll must not move the camera. Manual layout changes retain actual reading
+scale and world center. Radar uses camera reveal instead of document scrolling.
+Print restores all reading content and authored SVG paint; embed, presentation
+and the existing narrow-screen reader retain their own contracts. Page zoom that
+crosses 720 CSS px switches to the existing narrow-screen rules.
+
+Visual checking exercises public camera access to the world corners and local
+access to the last note/index entries before accepting `camera-viewport`.
+A hidden overflow marker alone is insufficient: inaccessible content, an invalid
+authored world, unreadable text and page overflow still fail. Default-output
+browser tests additionally cover native navigation and local scroll ownership.

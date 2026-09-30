@@ -377,7 +377,7 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
     assert.ok(result.initialClip.startsWith('inset('));
     assert.ok(result.duringClip.startsWith('inset('));
     assert.notEqual(result.duringClip, result.initialClip, 'drag must update the clip as nodes move into view');
-    assert.equal(result.overflow, 'hidden');
+    assert.equal(result.overflow, 'clip');
     const finalClip = await run(`document.querySelector('.diagram-container > svg').style.clipPath`);
     assert.ok(finalClip.startsWith('inset('));
     assert.notEqual(finalClip, result.initialClip);
@@ -430,6 +430,7 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
     const stopped = await run(`Archify.view.state()`);
     await run(`new Promise(resolve => setTimeout(resolve, 150))`, true);
     assert.deepEqual(await run('Archify.view.state()'), stopped);
+    assert.deepEqual(await run(`(()=>{const c=document.querySelector('.diagram-container');return [c.scrollLeft,c.scrollTop,scrollX,scrollY]})()`), [0,0,0,0], 'Tab cannot move a hidden document scroller behind the camera');
     assert.equal(await run(`document.querySelector('.diagram-container').classList.contains('is-keyboard-panning')`), false);
     await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
   });

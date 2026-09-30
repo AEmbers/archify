@@ -27,7 +27,15 @@ const pageHelpers = `(() => {
     const panel = document.querySelector('.diagram-container');
     const svg = panel.querySelector(':scope > svg');
     const nav = panel.querySelector('.diagram-nav');
-    const stage = svg.getBoundingClientRect();
+    const svgBox = svg.getBoundingClientRect(), panelBox = panel.getBoundingClientRect(), css = getComputedStyle(panel);
+    // Observe the actual visible paint region independently of the owners.
+    // The authored SVG may extend beyond the fixed viewport at reading size.
+    const stage = html.hasAttribute('data-fixed-canvas') ? {
+      left: Math.max(svgBox.left, panelBox.left + panel.clientLeft + parseFloat(css.paddingLeft)),
+      top: Math.max(svgBox.top, panelBox.top + panel.clientTop + parseFloat(css.paddingTop)),
+      right: Math.min(svgBox.right, panelBox.left + panel.clientLeft + panel.clientWidth - parseFloat(css.paddingRight)),
+      bottom: Math.min(svgBox.bottom, panelBox.top + panel.clientTop + panel.clientHeight - parseFloat(css.paddingBottom))
+    } : svgBox;
     // The dock may lift to the viewport floor; layout contracts use its resting box.
     const dock = Archify.viewerChromeLayout.dockRect();
     return {
@@ -231,6 +239,7 @@ test('one joint wait in a document shell preserves real Reader/Chrome convergenc
       assert.equal(raw.rail, 'true', label);
       assert.equal(raw.rootRail, 'true', label);
       assert.ok(raw.dimensions[2] <= raw.dimensions[0], `${label}: horizontal containment`);
+      assert.ok(raw.dimensions[3] <= raw.dimensions[1] + 1, `${label}: vertical containment`);
     }
     function unchanged(before, after, label) {
       for (const key of ['viewBox', 'authoredSemantic', 'payloads']) assert.deepEqual(after[key], before[key], `${label}: ${key}`);
@@ -333,8 +342,8 @@ test('one joint wait in a document shell preserves real Reader/Chrome convergenc
         document.documentElement.setAttribute('data-preset', 'blueprint');
       `);
       clearStage(after, 'feedback-after');
-      assert.equal(after.overflow, 'authored');
-      assert.ok(after.dimensions[3] > after.dimensions[1]);
+      assert.equal(after.overflow, null);
+      assert.ok(after.dimensions[3] <= after.dimensions[1] + 1);
       assert.ok(after.reserve > before.reserve, 'nav resize adds reserve and schedules Reader');
       assert.ok(parseFloat(after.readerWidth) <= parseFloat(before.readerWidth));
       const counts = await evaluate('__jointObservers');
@@ -464,11 +473,13 @@ test('one joint wait in a document shell preserves real Reader/Chrome convergenc
       assert.equal(before.readerFit, 'intrinsic-height');
       const exportedBefore = await canonicalExport();
       assert.equal(exportedBefore.canonical, 'true');
-      const overflow = await joint('intrinsic-overflow', `document.querySelector('.header').style.minHeight = '1200px';`);
-      assert.equal(overflow.overflow, 'authored');
+      const overflow = await joint('intrinsic-overflow', `document.querySelector('.header').style.minHeight = '240px';
+        document.querySelector('.cards').style.minHeight = '1200px';`);
+      assert.equal(overflow.overflow, null);
       clearStage(overflow, 'intrinsic overflow');
       unchanged(before, overflow, 'intrinsic overflow');
-      await joint('intrinsic-content-restored', `document.querySelector('.header').style.minHeight = '';`);
+      await joint('intrinsic-content-restored', `document.querySelector('.header').style.minHeight = '';
+        document.querySelector('.cards').style.minHeight = '';`);
       for (const mode of ['embed', 'present', 'print']) {
         if (mode === 'print') {
           await send('Emulation.setEmulatedMedia', { media: 'print' });

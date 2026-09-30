@@ -142,7 +142,7 @@ test('a document-shell first-screen fit never pushes relationship labels below t
   const browser = new ChromeVisualBrowser(findChrome());
   try {
 
-    await browser.inspect({ artifactPath: output, width: 1440, height: 900, theme: 'light' });
+    const inspection = await browser.inspect({ artifactPath: output, width: 1440, height: 900, theme: 'light' });
     const session = await browser.sessionPromise;
     const result = await browser.cdp.send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
       const svg = document.querySelector('.diagram-container > svg');
@@ -156,8 +156,13 @@ test('a document-shell first-screen fit never pushes relationship labels below t
     const { edges, overflow } = result.result.value;
     assert.ok(edges.length === 2, JSON.stringify(edges));
     assert.ok(edges.every(size => size >= 6), JSON.stringify(edges));
-    // This graph is taller than the floor allows, so it scrolls as authored.
-    assert.equal(overflow, 'authored');
+    // Preserve the edge floor while accessing the tall authored world through
+    // the camera; the fixed desktop shell has no document scroll fallback.
+    assert.equal(overflow, null);
+    assert.equal(inspection.fixedCanvas, true);
+    assert.deepEqual(inspection.viewportAccess, { camera: true, reader: true, page: true });
+    assert.ok(inspection.scrollWidth <= inspection.innerWidth + 1);
+    assert.ok(inspection.scrollHeight <= inspection.innerHeight + 1);
 
     // Moving the notes beside the diagram docks the rail. The shell keeps its
     // desktop floor, but the SVG gets only the diagram's share: its primary

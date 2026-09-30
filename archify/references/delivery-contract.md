@@ -384,7 +384,20 @@ The receipt binds the artifact SHA-256 and byte count, identifies
 `evidenceKind: "automated-browser"`, and reports
 `visualReview: "not-requested"`.
 
-Horizontal overflow always fails. Normal document-level vertical scrolling is
+For ordinary interactive screens above 720 CSS px, the bounded desktop Viewer
+instead declares `data-fixed-canvas` at runtime. Its root page must have zero
+horizontal and vertical scroll range. It keeps the SVG's authored geometry and
+reading size, with a camera viewport and locally scrolling notes/index. A marker
+or hidden overflow is not sufficient evidence: visual-check exercises the public
+camera against the world corners, rejects semantic nodes outside the authored
+world, and scrolls the last visible note/index entry into its own visible region.
+The receipt records `cameraViewportAccepted: true`, access evidence and
+`overflowDisposition: "camera-viewport"`. Native browser regressions verify pan,
+input ownership and actual content reachability. Invalid geometry, inaccessible
+reading content and unreadable text still fail. Print, embed, presentation and
+screens at or below 720 CSS px keep their existing policies.
+
+Horizontal overflow always fails. In the document reader, normal document-level vertical scrolling is
 accepted only with a renderer-declared contract and measured readable text.
 Automatic canvases declare `data-reader-fit="intrinsic-height"`; their adaptive
 Reader must reach its readable width and expose `data-reader-overflow="authored"`.
@@ -393,11 +406,11 @@ Architecture with an explicit `meta.viewBox` instead declares
 its SVG coordinates, aspect ratio and existing Reader width behavior stay
 unchanged. Its full SVG must remain inside the diagram panel without internal
 scrolling or clipping, and the document must permit vertical scrolling.
-The receipt records `verticalScrollAccepted: true` and
+The document-reader receipt records `verticalScrollAccepted: true` and
 `overflowDisposition: "readable-vertical-scroll"`. Missing or unknown declarations,
 explicit viewBoxes in other modes, unreadable text, horizontal overflow,
-clipping and Viewer chrome collisions remain failures. Do not add an internal
-diagram scroller or hide overflow.
+inaccessible clipping and Viewer chrome collisions remain failures. Do not replace
+whole-page scrolling with an internal diagram scroller or hide inaccessible content.
 
 `browser_evidence` in the handoff records only the outcome of this automated
 command:

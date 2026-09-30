@@ -811,6 +811,7 @@
         findBtn.setAttribute('aria-label', viewerText('viewer.route.start.find.aria'));
         copyBtn.hidden = true;
         setTrigger(true);
+        requestDocking();
         if (focused && nodesById()[focused]) chooseStart(focused);
         if (options.focusNode === true && !focused) {
           var first = nodes()[0];

@@ -73,7 +73,8 @@ test('real browser page zoom preserves the reader and switches legend at the mob
           assert.ok(Math.abs(observation.dpr - factor) < 0.01, 'Chrome must actually apply page zoom: ' + JSON.stringify(observation));
           assert.equal(observation.pinch, 1, 'pinch zoom must remain inactive');
           assert.equal(observation.camera.scale, 1, 'each page-zoom observation uses an explicit 100% diagram reset');
-          assert.equal(observation.fixed, false);
+          assert.equal(observation.fixed, observation.css[0] > 720);
+          if (observation.fixed) assert.ok(observation.rootRange[1] <= 1, 'no vertical page overflow: ' + JSON.stringify(observation));
           assert.equal(observation.cards, 3);
           assert.equal(observation.dockVisible, observation.css[0] > 720);
           assert.equal(observation.legendVisible, observation.css[0] <= 720);

@@ -30,13 +30,14 @@ const observation = `(() => {
     texts:[...s.querySelectorAll('text')].map(n=>n.textContent),errors:framingErrors};
 })()`;
 function contained(o,label) {
-  assert.equal(o.fixed,false,label);
+  assert.equal(o.fixed,true,label);
   for(const [a,b,sign] of [['left','left',1],['top','top',1],['right','right',-1],['bottom','bottom',-1]])
     assert.ok(sign*(o.svg[a]-o.stage[b])>=14,`${label} ${a}: ${JSON.stringify(o)}`);
   assert.ok(Math.abs((o.svg.left+o.svg.right-o.stage.left-o.stage.right)/2)<=2,label+' horizontal center');
   assert.ok(Math.abs((o.svg.top+o.svg.bottom-o.stage.top-o.stage.bottom)/2)<=2,label+' vertical center');
   assert.ok(o.effective>0,label+' valid scale');
-  assert.ok(o.range[0]<=1,label+' no horizontal page overflow');assert.deepEqual(o.errors,[]);
+  assert.ok(o.range.every(v=>v<=1),label+' no page overflow');
+  assert.deepEqual(o.page,[0,0],label+' stationary page');assert.deepEqual(o.errors,[]);
 }
 function sameReading(before,after,label) {
   assert.ok(Math.abs(after.effective/before.effective-1)<=.005,label+' actual scale');
@@ -125,8 +126,8 @@ test('Canvas preserves dev initial reading and explicit Fit all navigation',{
       }
       await load(fixture.file,width,height,theme);
       const initial=await sample('candidate-'+fixture.name+'-'+width+'-'+theme);await shot('candidate-'+fixture.name+'-'+width+'-'+theme);
-      assert.deepEqual(initial.state,{scale:1,x:0,y:0,mode:'overview'});assert.equal(initial.fixed,false);
-      assert.ok(initial.range[0]<=1);assert.deepEqual(initial.errors,[]);
+      assert.deepEqual(initial.state,{scale:1,x:0,y:0,mode:'overview'});assert.equal(initial.fixed,true);
+      assert.ok(initial.range.every(v=>v<=1),'bounded page at original reading size');assert.deepEqual(initial.page,[0,0]);assert.deepEqual(initial.errors,[]);
       if(before){
         assert.equal(initial.viewBox,before.viewBox);assert.deepEqual(initial.nodes,before.nodes);assert.deepEqual(initial.texts,before.texts);
         assert.ok(Math.abs(initial.effective/before.effective-1)<.005,'preserve dev initial reading scale: '+JSON.stringify({before:before.effective,after:initial.effective}));

@@ -38,6 +38,16 @@
       }
       function protectedStageRect() {
         if (!svg) return null;
+        if (html.hasAttribute('data-fixed-canvas')) {
+          var viewport = container.getBoundingClientRect();
+          var style = getComputedStyle(container);
+          var left = viewport.left + container.clientLeft + (parseFloat(style.paddingLeft) || 0);
+          var top = viewport.top + container.clientTop + (parseFloat(style.paddingTop) || 0);
+          var right = viewport.left + container.clientLeft + container.clientWidth - (parseFloat(style.paddingRight) || 0);
+          var bottom = viewport.top + container.clientTop + container.clientHeight - (parseFloat(style.paddingBottom) || 0);
+          return { x: left, y: top, left: left, top: top, right: right, bottom: bottom,
+            width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+        }
         var rect = svg.getBoundingClientRect();
         var transform = '';
         try { transform = window.getComputedStyle(svg).transform || ''; } catch (_) {}

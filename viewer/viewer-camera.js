@@ -79,7 +79,10 @@
         return document.documentElement.getAttribute('data-embed') !== 'true' && !mobileScrollMode();
       }
       function boundCamera() {
-        state.scale = Number.isFinite(state.scale) && state.scale > 0 ? Math.min(MAX_SCALE, state.scale) : 1;
+        // Input commands enforce MAX_SCALE. A layout restoration may need a
+        // larger relative factor when the SVG's CSS reading width shrinks;
+        // clamping it here would silently reduce the retained physical size.
+        state.scale = Number.isFinite(state.scale) && state.scale > 0 ? state.scale : 1;
         state.x = boundPosition(state.x);
         state.y = boundPosition(state.y);
       }
@@ -250,17 +253,19 @@
       }
       function clipToViewport(camera) {
         camera = camera || state;
-        if (camera.scale <= 1.001) {
+        var fixedCanvas = document.documentElement.hasAttribute('data-fixed-canvas');
+        if (!fixedCanvas && camera.scale <= 1.001) {
           svg.style.removeProperty('clip-path');
           return;
         }
         var width = svg.clientWidth || 1;
         var height = svg.clientHeight || 1;
         var scale = camera.scale;
-        var top = Math.max(0, Math.min(height, -camera.y / scale));
-        var left = Math.max(0, Math.min(width, -camera.x / scale));
-        var right = Math.max(0, Math.min(width, width - (width - camera.x) / scale));
-        var bottom = Math.max(0, Math.min(height, height - (height - camera.y) / scale));
+        var viewport = fixedCanvas && canvasGeometry;
+        var top = Math.max(0, Math.min(height, ((viewport ? viewport.top : 0) - camera.y) / scale));
+        var left = Math.max(0, Math.min(width, ((viewport ? viewport.left : 0) - camera.x) / scale));
+        var right = Math.max(0, Math.min(width, width - ((viewport ? viewport.right : width) - camera.x) / scale));
+        var bottom = Math.max(0, Math.min(height, height - ((viewport ? viewport.bottom : height) - camera.y) / scale));
         svg.style.clipPath = 'inset(' + [top, right, bottom, left].map(function (value) {
           return Math.round(value * 1000) / 1000 + 'px';
         }).join(' ') + ')';
@@ -548,9 +553,12 @@
         options = options || {};
         if (options.manual !== false) interruptCamera();
         var previous = state.scale;
-        next = Math.max(Math.min(minimumScale, previous), Math.min(MAX_SCALE, Number(next) || previous));
+        // Layout compensation can exceed the relative input cap. It may be
+        // reduced by input, never increased; a zoom-in must not reverse.
+        var inputMaximum = Math.max(MAX_SCALE, previous);
+        next = Math.max(Math.min(minimumScale, previous), Math.min(inputMaximum, Number(next) || previous));
         if (options.discrete === true && previous >= MIN_SCALE && next >= MIN_SCALE) {
-          next = Math.max(minimumScale, Math.round(next * 4) / 4);
+          next = Math.max(minimumScale, Math.min(inputMaximum, Math.round(next * 4) / 4));
         }
         if (next === previous) return;
         var contentX = (anchorX - state.x) / previous;

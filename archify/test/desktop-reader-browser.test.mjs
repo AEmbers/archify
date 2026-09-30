@@ -68,9 +68,9 @@ test('default sequence and dataflow canvases fit the real desktop reader without
         execFileSync(process.execPath, [path.join(skillRoot, 'bin/archify.mjs'), 'render', type, input, artifact]);
         const result = await runVisualCheck({ artifactPath: artifact, chromePath });
         if (authored) {
-          assert.equal(result.exitCode, 1, `${type}: explicit narrow canvas still requires repair`);
-          assert.ok(result.receipt.diagnostics.some(({ code }) => code === 'viewer/viewport-overflow'));
-          assert.ok(result.receipt.containment.viewports.every((v) => !v.verticalScrollAccepted));
+          assert.equal(result.exitCode, 0, `${type}: ${JSON.stringify(result.receipt.diagnostics)}`);
+          assert.ok(result.receipt.containment.viewports.every(v => v.fixedCanvas && v.cameraViewportAccepted
+            && v.viewportAccess.camera && v.viewportAccess.reader && !v.overflowY && !v.verticalScrollAccepted));
         } else {
           assert.equal(result.exitCode, 0, `${type}: ${JSON.stringify(result.receipt.diagnostics)}`);
           assert.equal(result.receipt.readability.status, 'pass');
@@ -229,7 +229,7 @@ test('production showcase is readable in the real 1440 by 900 adaptive reader', 
   }
 });
 
-test('route-expanded intrinsic architecture preserves reading size with ordinary page scroll', {
+test('route-expanded intrinsic architecture preserves reading size inside the camera viewport', {
   skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
 }, async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-route-expanded-reader-'));
@@ -287,7 +287,7 @@ test('route-expanded intrinsic architecture preserves reading size with ordinary
   }
 });
 
-test('extreme intrinsic architecture keeps readable page scroll below first-screen fit', {
+test('extreme intrinsic architecture keeps readable text and proves complete camera access', {
   skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
 }, async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-readable-scroll-reader-'));
@@ -318,12 +318,12 @@ test('extreme intrinsic architecture keeps readable page scroll below first-scre
     const result = await runVisualCheck({ artifactPath: artifact, chromePath });
     assert.equal(result.exitCode, 0, JSON.stringify(result.receipt, null, 2));
     assert.equal(result.receipt.containment.status, 'pass');
-    assert.equal(result.receipt.containment.policy, 'fit-or-reader-declared-readable-vertical-scroll');
+    assert.equal(result.receipt.containment.policy, 'camera-viewport-or-fit-or-reader-declared-readable-vertical-scroll');
     assert.equal(result.receipt.readability.status, 'pass');
     assert.equal(result.receipt.viewerChrome.status, 'pass');
     assert.equal(result.receipt.diagnostics.length, 0, JSON.stringify(result.receipt, null, 2));
 
-    let scrollViewportCount = 0;
+    let cameraViewportCount = 0;
     for (const viewport of result.receipt.containment.viewports) {
       assert.equal(viewport.overflowX, false, JSON.stringify(viewport, null, 2));
       for (const [field, floor] of [
@@ -334,8 +334,13 @@ test('extreme intrinsic architecture keeps readable page scroll below first-scre
         assert.ok(Number.isFinite(viewport[field]), field + ': ' + JSON.stringify(viewport, null, 2));
         assert.ok(viewport[field] >= floor, field + ': ' + JSON.stringify(viewport, null, 2));
       }
-      if (viewport.overflowY) {
-        scrollViewportCount += 1;
+      if (viewport.fixedCanvas) {
+        cameraViewportCount += 1;
+        assert.equal(viewport.overflowY, false);
+        assert.equal(viewport.cameraViewportAccepted, true);
+        assert.deepEqual(viewport.viewportAccess, { camera: true, reader: true, page: true });
+        assert.equal(viewport.overflowDisposition, 'camera-viewport');
+      } else if (viewport.overflowY) {
         assert.equal(viewport.verticalScrollAccepted, true, JSON.stringify(viewport, null, 2));
         assert.equal(viewport.overflowDisposition, 'readable-vertical-scroll');
         assert.equal(viewport.readerLayout, 'adaptive');
@@ -347,13 +352,13 @@ test('extreme intrinsic architecture keeps readable page scroll below first-scre
         assert.equal(viewport.overflowDisposition, 'contained');
       }
     }
-    assert.ok(scrollViewportCount > 0, 'expected the extreme intrinsic diagram to exercise readable page scroll');
+    assert.ok(cameraViewportCount > 0, 'expected the extreme intrinsic diagram to prove camera access');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 
-test('offline intrinsic workflows fit while authored overflow still identifies lane frames', {
+test('offline workflows preserve lane frames and prove camera access without reflow', {
   skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
 }, async () => {
   const fixtureRoot = path.join(skillRoot, 'test/fixtures/workflow-viewport');
@@ -396,12 +401,14 @@ test('offline intrinsic workflows fit while authored overflow still identifies l
         },
       });
       if (name === 'order-pinned-overflow') {
-        assert.equal(result.exitCode, 1);
-        const diagnostic = result.receipt.diagnostics.find(({ code }) => code === 'viewer/viewport-overflow');
-        assert.ok(diagnostic, JSON.stringify(result.receipt));
-        assert.equal(diagnostic.evidence.workflowLanes[0].frameId, 'lane-0');
-        assert.equal(diagnostic.evidence.workflowLanes[0].nodeCount, 12);
-        assert.ok(diagnostic.evidence.workflowLanes[0].spaceAboveNodesPx > 100);
+        assert.equal(result.exitCode, 0, JSON.stringify(result.receipt));
+        for (const viewport of result.receipt.containment.viewports) {
+          assert.equal(viewport.cameraViewportAccepted, true);
+          assert.equal(viewport.overflowY, false);
+          assert.equal(viewport.workflowLanes[0].frameId, 'lane-0');
+          assert.equal(viewport.workflowLanes[0].nodeCount, 12);
+          assert.ok(viewport.workflowLanes[0].spaceAboveNodesPx > 100);
+        }
       } else {
         assert.equal(result.exitCode, 0, JSON.stringify(result.receipt));
         assert.equal(result.receipt.containment.status, 'pass');
@@ -493,7 +500,7 @@ test('issue #250 five-stage stack fits below source scale without crossing the r
   }
 });
 
-test('authored Architecture canvas keeps its scale and accepts readable document scrolling', {
+test('authored Architecture keeps its reading size and rejects inaccessible camera windows', {
   skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
 }, async t => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-authored-reader-'));
@@ -518,7 +525,7 @@ test('authored Architecture canvas keeps its scale and accepts readable document
   const baseline = path.join(tmp, 'legacy.html');
   fs.writeFileSync(baseline, html.replace(' data-reader-fit="authored-height"', ''));
   const old = await runVisualCheck({ artifactPath: baseline, chromePath });
-  assert.equal(old.exitCode, 1, 'legacy page rejects ordinary document overflow');
+  assert.equal(old.exitCode, 0, 'camera access protects explicit geometry without relying on the document-scroll declaration');
   const result = await runVisualCheck({ artifactPath: artifact, chromePath });
   assert.equal(result.exitCode, 0, JSON.stringify(result.receipt.diagnostics));
   for (const viewport of result.receipt.containment.viewports) {
@@ -527,12 +534,16 @@ test('authored Architecture canvas keeps its scale and accepts readable document
     assert.equal(viewport.readerWidth, before.readerWidth);
     assert.equal(viewport.readerLayout, before.readerLayout);
     assert.equal(viewport.readerFit, 'authored-height');
+    assert.equal(viewport.cameraViewportAccepted, true);
     assert.equal(viewport.overflowX, false);
     if (viewport.overflowY) assert.equal(viewport.verticalScrollAccepted, true);
   }
-  for (const overflow of ['hidden', 'auto']) {
-    const clipped = path.join(tmp, `clipped-${overflow}.html`);
-    fs.writeFileSync(clipped, html.replace('</head>', `<style>.diagram-container { height: 300px !important; overflow: ${overflow} !important; }</style></head>`));
+  for (const [name,damage] of [
+    ['zero-stage','<style>.diagram-container { max-height: 0 !important; }</style>'],
+    ['no-camera','<script>Archify.view.centerAt = function () { return false; };</script>'],
+  ]) {
+    const clipped = path.join(tmp, `clipped-${name}.html`);
+    fs.writeFileSync(clipped, html.replace('</body>', damage + '</body>'));
     const failed = await runVisualCheck({ artifactPath: clipped, chromePath });
     assert.equal(failed.exitCode, 1);
     assert.ok(failed.receipt.diagnostics.some(d => d.code === 'viewer/diagram-clipped'), JSON.stringify(failed.receipt.diagnostics));

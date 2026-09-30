@@ -270,7 +270,7 @@ function inspection({ capability = true, rejectJoint = false, localMethods = tru
   } };
   const page = vm.createContext({
     Archify, window: { Archify },
-    document: { documentElement: { setAttribute() {} }, querySelector: () => null,
+    document: { documentElement: { setAttribute() {}, hasAttribute() { return false; } }, querySelector: () => null,
       fonts: { ready: Promise.resolve(), status: 'loaded' } },
     requestAnimationFrame(callback) { rafCount++; queueMicrotask(callback); },
   });
@@ -294,6 +294,9 @@ function inspection({ capability = true, rejectJoint = false, localMethods = tru
         }
       }
       if (method === 'Page.captureScreenshot') return { data: PNG_STUB };
+      if (method === 'Runtime.evaluate' && params.expression.includes("html.hasAttribute('data-fixed-canvas')")) {
+        return { result: { value: vm.runInContext(params.expression, page) } };
+      }
       if (method === 'Runtime.evaluate') return { result: { value: {
         innerWidth: current.width, innerHeight: current.height, scrollWidth: current.width, scrollHeight: current.height,
         resolvedTheme: current.theme, minimumProjectedNodeTextPx: 12, hasNavigationDock: false,
