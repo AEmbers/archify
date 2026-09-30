@@ -139,7 +139,7 @@ export async function loadDiagramWithBrandMarks(options) {
   return loaded;
 }
 
-const START_TYPES = new Set(['architecture', 'workflow', 'sequence', 'dataflow', 'lifecycle']);
+const START_TYPES = new Set(['architecture', 'workflow', 'sequence', 'dataflow', 'lifecycle', 'erd']);
 
 function isFilesystemError(error) {
   return typeof error?.code === 'string'
@@ -336,6 +336,7 @@ const SEMANTIC_COLLECTIONS = {
   sequence: 'participants',
   dataflow: 'nodes',
   lifecycle: 'states',
+  erd: 'entities',
 };
 
 const RELATIONSHIP_COLLECTIONS = {
@@ -344,6 +345,7 @@ const RELATIONSHIP_COLLECTIONS = {
   sequence: 'messages',
   dataflow: 'flows',
   lifecycle: 'transitions',
+  erd: 'relationships',
 };
 
 // Relationship IDs are optional for backwards compatibility, but once an

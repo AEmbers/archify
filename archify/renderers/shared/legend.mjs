@@ -191,7 +191,10 @@ export function measureLegend(entries, {
   };
 }
 
-export function renderLegend({ entries, layout, renderSwatch, locale }) {
+// `labelClass`/`labelWeight` let a renderer state that its legend labels are
+// the same ink and weight as the value they describe; both default to the
+// shared presentation, so callers that pass nothing keep their exact bytes.
+export function renderLegend({ entries, layout, renderSwatch, locale, labelClass = 't-muted', labelWeight = 500 }) {
   if (!entries.length) return '';
   const measured = measureLegend(entries, layout);
   if (!measured) return '';
@@ -209,7 +212,7 @@ export function renderLegend({ entries, layout, renderSwatch, locale }) {
       : '';
     parts.push(`          <g data-legend-semantic-kind="${esc(entry.kind)}"${interactive} data-legend-x="${entry.x}" data-legend-baseline="${entry.baseline}" data-legend-width="${entry.width}">`);
     parts.push(`            ${renderSwatch(entry)}`);
-    parts.push(`            <text x="${entry.x + (entry.swatchWidth ?? 14) + (entry.swatchGap ?? DEFAULT_SWATCH_GAP)}" y="${entry.baseline}" class="t-muted" font-size="${renderedFontSize}" font-weight="500">${esc(entry.label)}</text>`);
+    parts.push(`            <text x="${entry.x + (entry.swatchWidth ?? 14) + (entry.swatchGap ?? DEFAULT_SWATCH_GAP)}" y="${entry.baseline}" class="${labelClass}" font-size="${renderedFontSize}" font-weight="${labelWeight}">${esc(entry.label)}</text>`);
     parts.push('          </g>');
   }
   parts.push('        </g>');
