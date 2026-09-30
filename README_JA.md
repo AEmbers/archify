@@ -42,13 +42,11 @@
 
 ## 実際の Archify
 
-<p align="center">
-  <a href="https://tt-a1i.github.io/archify/gallery.html"><img src="docs/assets/archify-live-proof.gif" alt="Signal Flow、Blueprint、Classic の各プリセットで動作する 3 つの検証済み Archify 成果物" width="960"/></a>
-  <br/>
-  <sub><strong>実際に生成された 3 つの成果物。</strong> Signal Flow · Blueprint · Classic · <a href="https://tt-a1i.github.io/archify/gallery.html">インタラクティブな Proof Lab を開く ↗</a></sub>
-</p>
+<!-- archify-launch-video -->
 
-**プレビューをクリックすると、実際のインタラクティブな成果物が開きます。** GIF は動きを見せるためのもので、実際に探索できるのはブラウザで開く HTML のほうです。
+https://github.com/user-attachments/assets/78570807-ba1d-4737-953f-55504a378a87
+
+**ひと言で、リポジトリを可視化。** 約35秒の英語デモで、図の操作、ソースコードへのリンク、経路の追跡をご覧ください。[インタラクティブな作例を試す ↗](https://tt-a1i.github.io/archify/gallery.html)
 
 <a id="start"></a>
 
@@ -402,6 +400,30 @@ Mermaid の自動パース、汎用オートレイアウト、ホスティング
 ## コントリビュート
 
 Issue、プルリクエスト、実際の図の投稿を歓迎します。まずは[コントリビューションガイド](CONTRIBUTING.md)をご覧ください。不具合は再現可能なバグ報告フォームから、検証済みの図は[コミュニティショーケースフォーム](https://github.com/tt-a1i/archify/issues/new?template=showcase.yml)から投稿できます。&nbsp;·&nbsp;[LINUX&nbsp;DO](https://linux.do)
+
+## Archify を支援する
+
+Archify が役に立ったら、継続的な開発をご支援いただけるとうれしいです。プロジェクトへの応援、ありがとうございます ❤️
+
+<details>
+<summary>WeChat Pay で支援する</summary>
+
+WeChat で下の QR コードをスキャンするか、画像を保存して WeChat で読み取ってください。
+
+<p align="center"><img src="docs/assets/support/wechat-pay.png" alt="Archify の開発者を支援する WeChat Pay の QR コード" width="240" /></p>
+
+</details>
+
+<details>
+<summary>Alipay で支援する</summary>
+
+Alipay で下の QR コードをスキャンするか、画像を保存して Alipay で読み取ってください。
+
+<p align="center"><img src="docs/assets/support/alipay.png" alt="Archify の開発者を支援する Alipay の QR コード（氏名は非表示）" width="240" /></p>
+
+</details>
+
+利用、共有、不具合の報告、改善への貢献も、プロジェクトの支えになります。
 
 ## Star History
 

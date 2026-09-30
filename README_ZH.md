@@ -44,13 +44,11 @@
 
 ## 看看 Archify 能做什么
 
-<p align="center">
-  <a href="https://tt-a1i.github.io/archify/gallery.html"><img src="docs/assets/archify-live-proof.gif" alt="三个经过验证的 Archify 成品依次展示 Signal Flow、Blueprint 和 Classic 预设" width="960"/></a>
-  <br/>
-  <sub><strong>三个真实生成、校验通过的成品。</strong> Signal Flow · Blueprint · Classic · <a href="https://tt-a1i.github.io/archify/gallery.html">打开可交互验证作品集 ↗</a></sub>
-</p>
+<!-- archify-launch-video -->
 
-**点击上方预览，打开真实交互成品。** GIF 展示效果，浏览器中的 HTML 才能点击探索。
+https://github.com/user-attachments/assets/88cff7dd-bdf3-4b97-950c-37cc079898b1
+
+**一句话，看懂你的项目。** 35 秒演示：探索交互图、查看源码关联、追踪完整路径。[试试可交互示例 ↗](https://tt-a1i.github.io/archify/gallery.html)
 
 <a id="start"></a>
 
@@ -418,6 +416,30 @@ node bin/archify.mjs deliver workflow examples/agent-tool-call.workflow.json /tm
 欢迎提交 Issue、Pull Request 和真实场景图。请先阅读[贡献指南](CONTRIBUTING.md)；遇到问题时使用可复现 Bug 表单，也可以通过[社区 Showcase 表单](https://github.com/tt-a1i/archify/issues/new?template=showcase.yml)提交已验证成品。
 
 较大的功能或行为调整请先通过 Issue 对齐价值、兼容边界和非目标，再基于最新 `main` 开发。一个 PR 尽量只解决一个问题；核心代码和回归测试先行，生成物最后统一重建。Archify 坚持 Agent-first，优先完善稳定的机器可读诊断和现有权威合同，避免新增容易与 CLI 漂移的重复说明。&nbsp;·&nbsp;[LINUX&nbsp;DO](https://linux.do)
+
+## 支持 Archify
+
+如果 Archify 对你有帮助，欢迎支持项目的持续开发。谢谢你让这个项目继续走下去 ❤️
+
+<details>
+<summary>通过微信赞赏支持</summary>
+
+使用微信扫描下方二维码，或保存图片后在微信中识别。
+
+<p align="center"><img src="docs/assets/support/wechat-pay.png" alt="支持 Archify 作者的微信收款码" width="240" /></p>
+
+</details>
+
+<details>
+<summary>通过支付宝赞赏支持</summary>
+
+使用支付宝扫描下方二维码，或保存图片后在支付宝中识别。
+
+<p align="center"><img src="docs/assets/support/alipay.png" alt="支持 Archify 作者的支付宝收款码（姓名已遮挡）" width="240" /></p>
+
+</details>
+
+使用、分享、反馈问题和贡献改进，也都是对项目的支持。
 
 ## Star History
 

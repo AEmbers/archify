@@ -44,13 +44,11 @@
 
 ## See Archify in action
 
-<p align="center">
-  <a href="https://tt-a1i.github.io/archify/gallery.html"><img src="docs/assets/archify-live-proof.gif" alt="Three verified Archify artifacts moving through Signal Flow, Blueprint, and Classic presets" width="960"/></a>
-  <br/>
-  <sub><strong>Three real generated artifacts.</strong> Signal Flow · Blueprint · Classic · <a href="https://tt-a1i.github.io/archify/gallery.html">open the interactive Proof Lab ↗</a></sub>
-</p>
+<!-- archify-launch-video -->
 
-**Click the preview to open real interactive artifacts.** The GIF shows the motion; the HTML lets you explore it yourself.
+https://github.com/user-attachments/assets/78570807-ba1d-4737-953f-55504a378a87
+
+**One sentence. Your repo, mapped.** Watch the 35-second demo: explore the diagram, follow source links, and trace a path. [Try the interactive examples ↗](https://tt-a1i.github.io/archify/gallery.html)
 
 <a id="start"></a>
 
@@ -412,6 +410,30 @@ Connect with other users and developers, share ideas, request features, report b
 ## Contributing
 
 Issues, pull requests, and real-world diagrams are welcome. Start with the [contribution guide](CONTRIBUTING.md), use the reproducible bug form for failures, or submit a validated diagram through the [community showcase form](https://github.com/tt-a1i/archify/issues/new?template=showcase.yml).&nbsp;·&nbsp;[LINUX&nbsp;DO](https://linux.do)
+
+## Support Archify
+
+If Archify has been useful to you, you can support its continued development. Thank you for helping keep the project going ❤️
+
+<details>
+<summary>Support via WeChat Pay</summary>
+
+Scan the QR code below with WeChat, or save it and open it in WeChat to scan.
+
+<p align="center"><img src="docs/assets/support/wechat-pay.png" alt="WeChat Pay QR code to support the Archify maintainer" width="240" /></p>
+
+</details>
+
+<details>
+<summary>Support via Alipay</summary>
+
+Scan the QR code below with Alipay, or save it and open it in Alipay to scan.
+
+<p align="center"><img src="docs/assets/support/alipay.png" alt="Alipay QR code to support the Archify maintainer (name redacted)" width="240" /></p>
+
+</details>
+
+Using Archify, sharing it, reporting bugs, and contributing improvements are also ways to help.
 
 ## Star History
 
