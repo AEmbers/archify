@@ -433,8 +433,11 @@
   "viewer.rail.bottom": "패널을 다이어그램 아래로 이동",
   "viewer.rail.right": "패널을 다이어그램 옆으로 이동",
   "viewer.guide.canvas": "클릭하거나 Tab 키를 눌러 캔버스로 이동합니다. 마우스 오른쪽 버튼, 가운데 버튼 또는 Space+왼쪽 버튼을 드래그해 이동할 수 있습니다. 스크롤이나 방향키로 화면을 이동하고, Ctrl/Cmd+스크롤로 포인터 위치를 확대합니다. 0을 눌러 재설정합니다.",
-  "viewer.notes.title": "다이어그램 노트",
-  "viewer.notes.close": "다이어그램 노트 닫기",
   "viewer.nav.fitAll": "다이어그램 전체에 맞추기",
-  "viewer.nav.fitAll.short": "전체"
+  "viewer.nav.fitAll.short": "전체",
+  "viewer.nav.level.map": "개요",
+  "viewer.nav.level.read": "읽기",
+  "viewer.nav.level.full": "전체",
+  "viewer.nav.detail.map": "확대하면 관계 라벨과 노드 컨텍스트가 표시됩니다",
+  "viewer.nav.detail.read": "다시 확대하면 태그와 주석이 표시됩니다"
 }

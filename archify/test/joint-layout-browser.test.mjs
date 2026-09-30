@@ -1,4 +1,3 @@
-import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -153,7 +152,7 @@ test('one joint wait in a document shell preserves real Reader/Chrome convergenc
       execFileSync(process.execPath, [path.join(skillRoot, 'bin/archify.mjs'),
         'render', 'architecture', path.resolve(skillRoot, input), file,
         ...(repoRoot ? ['--repo-root', repoRoot] : [])], { stdio: 'pipe' });
-      useDocumentReader(file);
+
       return file;
     }
     // Use the existing evidence-browser fixture pattern so preservation covers

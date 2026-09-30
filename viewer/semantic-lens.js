@@ -23,6 +23,7 @@
       var legendToggle = null;
       var dockEntries = [];
       var dockLayoutKey = '';
+      var legendManuallyCollapsed = false;
       var hoveredLegendEntry = null;
       var focusedLegendEntry = null;
       var activeLegendPreview = null;
@@ -244,22 +245,24 @@
           var open = toggle.getAttribute('aria-expanded') !== 'true';
           toggle.setAttribute('aria-expanded', String(open));
           list.hidden = !open;
+          if (!dock.hasAttribute('data-collapsed')) legendManuallyCollapsed = !open;
           if (open) (dockEntries[0] || list).focus();
         });
         dock.addEventListener('keydown', function (event) {
           if (event.key !== 'Escape' || toggle.hidden) return;
           event.preventDefault(); event.stopPropagation();
           toggle.setAttribute('aria-expanded', 'false'); list.hidden = true; toggle.focus();
+          if (!dock.hasAttribute('data-collapsed')) legendManuallyCollapsed = true;
         });
         document.addEventListener('click', function (event) {
-          if (!toggle.hidden && !dock.contains(event.target)) {
+          if (dock.hasAttribute('data-collapsed') && !dock.contains(event.target)) {
             toggle.setAttribute('aria-expanded', 'false'); list.hidden = true;
           }
         });
         syncLegendBridge();
       }
       function legendDockActive() {
-        return Boolean(legendDock && html.hasAttribute('data-fixed-canvas') &&
+        return Boolean(legendDock && window.innerWidth > 720 &&
           html.getAttribute('data-present') !== 'true' && html.getAttribute('data-embed') !== 'true' &&
           !(window.matchMedia && window.matchMedia('print').matches));
       }
@@ -294,15 +297,14 @@
           legendDock.style.maxWidth = Math.max(0, bounds.width - nav.width - 42) + 'px';
           legendList.style.maxHeight = Math.min(320, bounds.height * .5) + 'px';
           legendDock.removeAttribute('data-collapsed');
-          legendList.hidden = false; legendToggle.hidden = true;
-          // Measure at most two complete rows. Long labels collapse instead of
+          legendList.hidden = false; legendToggle.hidden = false;
+          // Measure one complete row. Long labels collapse instead of
           // truncating; the expanded list can wrap and scroll inside the canvas.
           var rows = new Set(Array.prototype.map.call(legendList.children, function (entry) { return entry.offsetTop; }));
-          var collapse = rows.size > 2 || legendList.scrollWidth > legendList.clientWidth + 1;
+          var collapse = rows.size > 1 || legendList.scrollWidth > legendList.clientWidth + 1;
           legendDock.toggleAttribute('data-collapsed', collapse);
-          legendToggle.hidden = !collapse;
-          legendToggle.setAttribute('aria-expanded', 'false');
-          legendList.hidden = collapse;
+          legendList.hidden = collapse || legendManuallyCollapsed;
+          legendToggle.setAttribute('aria-expanded', String(!legendList.hidden));
         }
         if (hadFocus) {
           var target = oldKind ? legendFocusTarget(focused) : (active ? legendToggle : legendEntries[0] || trigger);
@@ -599,9 +601,8 @@
           Archify.focus.clear({ updateUrl: false, preserveView: true });
         }
         if (Archify.routeProbe && typeof Archify.routeProbe.clear === 'function') {
-          Archify.routeProbe.clear({ updateUrl: false, preserveView: true, restoreFocus: false });
+          Archify.routeProbe.clear({ updateUrl: false, restoreFocus: false });
         }
-        if (Archify.radar && Archify.radar.isOpen()) Archify.radar.close({ restoreFocus: false });
         if (Archify.intentTrace && typeof Archify.intentTrace.clear === 'function') {
           Archify.intentTrace.clear({ announce: false });
         }
@@ -635,9 +636,6 @@
         options = options || {};
         if (html.getAttribute('data-embed') === 'true') return false;
         lensOpener = options.opener || trigger;
-        if (Archify.routeProbe && Archify.routeProbe.active()) {
-          Archify.routeProbe.clear({ preserveView: true, restoreFocus: false });
-        }
         if (Archify.exportMenu && Archify.exportMenu.isOpen()) Archify.exportMenu.close(false);
         if (Archify.finder && Archify.finder.isOpen()) Archify.finder.close({ restoreFocus: false });
         if (Archify.radar && Archify.radar.isOpen()) Archify.radar.close({ restoreFocus: false });

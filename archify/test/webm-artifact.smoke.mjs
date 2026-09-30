@@ -393,7 +393,7 @@ try {
           roles: entries.map(function (entry) { return entry.getAttribute('role'); }),
           aria: entries.map(function (entry) { return entry.getAttribute('aria-label'); }),
           counts: entries.map(function (entry) { return entry.getAttribute('data-legend-count'); }),
-          tabStops: entries.filter(function (entry) { return entry.getAttribute('tabindex') === '0'; }).length,
+          tabStops: Array.from(document.querySelectorAll('.diagram-container[data-fixed-legend] .fixed-legend [data-legend-kind], .diagram-container:not([data-fixed-legend]) > svg [data-legend-kind]')).filter(function (entry) { return entry.getAttribute('tabindex') === '0'; }).length,
           inside: entries.every(function (entry) {
             var box = entry.getBBox();
             return box.x >= vb.x && box.y >= vb.y && box.x + box.width <= vb.x + vb.width && box.y + box.height <= vb.y + vb.height;
@@ -419,7 +419,7 @@ try {
 
     await navigateReady(outputs.dataflow, '!!(window.Archify && Archify.semanticLens && Archify.exportMenu)', 'Dataflow database legend runtime');
     const databaseRuntime = await evaluate(cdp, sessionId, String.raw`(async function () {
-      var entry = document.querySelector('[data-legend-kind="database"]');
+      var entry = document.querySelector('.fixed-legend [data-legend-kind="database"]') || document.querySelector('[data-legend-kind="database"]');
       entry.focus();
       entry.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       var originalCreateObjectURL = URL.createObjectURL;
@@ -454,7 +454,10 @@ try {
     const runtime = await evaluate(cdp, sessionId, String.raw`(async function () {
       var svg = document.querySelector('.diagram-container > svg');
       var entries = Array.from(svg.querySelectorAll('[data-legend-semantic-kind]'));
-      var interactive = entries.filter(function (entry) { return entry.hasAttribute('data-legend-kind'); });
+      var visibleLegend = document.querySelector('.diagram-container[data-fixed-legend] .fixed-legend') || svg;
+      var toggle = visibleLegend.querySelector('.fixed-legend-toggle');
+      if (toggle && toggle.getAttribute('aria-expanded') === 'false') toggle.click();
+      var interactive = Array.from(visibleLegend.querySelectorAll('[data-legend-kind]'));
       var first = interactive[0];
       var second = interactive[1];
       first.focus();

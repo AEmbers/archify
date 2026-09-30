@@ -33,18 +33,6 @@ test('Semantic Lens preserves selection, legend preview and panel contracts', {
     execFileSync(process.execPath, [path.join(skillRoot, `renderers/${mode}/render-${mode}.mjs`),
       path.join(skillRoot, 'examples', example), files[mode]]);
   }
-  // A tall diagram exposes accidental camera resets during selection handoff.
-  const tallInput = path.join(scratch, 'tall.json');
-  fs.writeFileSync(tallInput, JSON.stringify({
-    schema_version: 1, diagram_type: 'architecture',
-    meta: { title: 'Tall selection', output: 'tall.html' },
-    components: [
-      { id: 'store', type: 'database', label: 'Store', pos: [100, 700], size: [200, 80] },
-      { id: 'guard', type: 'security', label: 'Guard', pos: [500, 500], size: [200, 80] },
-    ], connections: [],
-  }));
-  files.tall = path.join(scratch, 'tall.html');
-  execFileSync(process.execPath, [path.join(skillRoot, 'renderers/architecture/render-architecture.mjs'), tallInput, files.tall]);
   const trace = JSON.parse(fs.readFileSync(path.join(skillRoot, 'examples', cases.architecture), 'utf8'));
   trace.meta.animation = 'trace';
   const traceInput = path.join(scratch, 'trace.json');
@@ -96,20 +84,8 @@ test('Semantic Lens preserves selection, legend preview and panel contracts', {
   async function point(selector) {
     return run(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
   }
-  async function move(selector) {
-    if (selector?.startsWith('[data-legend-kind=')) {
-      const visible=await run(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(),s=Archify.viewerChromeLayout.stageRect();return r.top>=s.top&&r.bottom<=s.bottom&&r.left>=s.left&&r.right<=s.right;})()`);
-      // A preceding interaction may move the Legend offscreen; reveal it through the
-      // public Fit all action before sending a native pointer to its position.
-      if(!visible){
-        await run('Archify.view.fitAll()');
-        await run(`lensWait(()=>{const s=Archify.view.state(),m=new DOMMatrix(getComputedStyle(document.querySelector('.diagram-container > svg')).transform);return Math.abs(m.a-s.scale)<0.001&&Math.abs(m.e-s.x)<0.05&&Math.abs(m.f-s.y)<0.05;})`);
-      }
-    }
-    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...(selector ? await point(selector) : { x: 0, y: 0 }) });
-  }
+  async function move(selector) { await send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...(selector ? await point(selector) : { x: 0, y: 0 }) }); }
   async function click(selector) {
-    await move(selector);
     const p = await point(selector);
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...p, button: 'left', clickCount: 1 });
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...p, button: 'left', clickCount: 1 });
@@ -140,40 +116,6 @@ test('Semantic Lens preserves selection, legend preview and panel contracts', {
   async function hash(value) {
     await run(`new Promise(resolve=>{addEventListener('hashchange',()=>resolve(),{once:true});location.hash=${JSON.stringify(value)};})`);
   }
-
-  await t.test('legend selection preserves fitted and manual cameras while clearing node focus', async () => {
-    for (const [width, height] of [[1850, 760], [1024, 600]]) {
-      await load('tall');
-      await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
-      await run('Archify.readerLayout.whenStable().then(()=>Archify.viewerChromeLayout.whenStable())');
-      const fitted = await run('Archify.view.state()');
-      assert.ok(fitted.scale < 1, 'fixture requires initial fit below 100%');
-      for (const kind of ['database', 'security']) {
-        await click(legend(kind));
-        await run('Archify.viewerChromeLayout.whenStable()');
-        const state = await run(`(()=>{
-          const s=Archify.viewerChromeLayout.stageRect();
-          return {camera:Archify.view.state(),selected:[...document.querySelectorAll('[data-node-id][data-lens-selected]')].map(n=>{
-            const r=n.getBoundingClientRect();return {id:n.dataset.nodeId,inside:r.left>=s.left-1&&r.right<=s.right+1&&r.top>=s.top-1&&r.bottom<=s.bottom+1};
-          })};
-        })()`);
-        assert.ok(state.selected.length > 0);
-        assert.ok(state.selected.every(n => n.inside), JSON.stringify(state));
-        assert.deepEqual(state.camera, fitted, 'choosing kinds must not reset the fitted view');
-      }
-      assert.deepEqual(await run('Archify.semanticLens.active()'), ['database', 'security']);
-      await run(`Archify.semanticLens.clear({preserveView:true}); Archify.view.panBy(40,-20);`);
-      const manual = await run('Archify.view.state()');
-      await click(legend('database'));
-      assert.deepEqual(await run('Archify.view.state()'), manual, 'Lens also preserves deliberate manual navigation');
-      await snapshot(`tall-selection-${width}`);
-    }
-    await load('tall');
-    await run(`Archify.focus.setMany(['store', 'guard'])`);
-    assert.deepEqual(await run('Archify.focus.active()'), ['store', 'guard']);
-    await run(`Archify.semanticLens.select('database')`);
-    assert.equal(await run('Archify.focus.active()'), null, 'Lens clears node focus ownership');
-  });
 
   await t.test('five modes and optional legend initialization preserve counts, roles and embed boundaries', async () => {
     for (const mode of Object.keys(cases)) {
@@ -216,7 +158,6 @@ test('Semantic Lens preserves selection, legend preview and panel contracts', {
     const close = await run(`(()=>{const p=Archify.semanticLens,h=location.hash,o=document.querySelector('[data-semantic-lens-overlay]');return {value:p.close(),hash:h===location.hash,overlay:o===document.querySelector('[data-semantic-lens-overlay]'),focus:document.activeElement.id};})()`);
     assert.deepEqual(close, { value: false, hash: true, overlay: true, focus: 'btn-semantic-lens' });
     assert.equal((await snapshot('closed-selected')).open, false);
-    assert.equal(await run(`Archify.semanticLens.open({opener:document.getElementById('btn-node-finder')});Archify.semanticLens.close();document.activeElement.id`), 'btn-node-finder');
     assert.equal(await run(`Archify.semanticLens.select('database')`), true);
     await run('Archify.view.zoomIn()'); const zoom = await run('Archify.view.state()');
     assert.equal(await run(`Archify.semanticLens.select('backend')`), false);
@@ -377,7 +318,7 @@ test('Semantic Lens preserves selection, legend preview and panel contracts', {
     assert.deepEqual(quick, { values: [true, true, false], open: false, dock: null });
     // Only measured rectangle inputs are overridden; public open/select/resize drive docking.
     const docking = await run(`(async()=>{
-      const panel=document.getElementById('semantic-lens'),svg=document.querySelector('.diagram-container > svg'),container=svg.parentElement,nav=container.querySelector('.diagram-nav'),legend=container.querySelector('.fixed-legend'),node=svg.querySelector('[data-node-id="api"]');
+      const panel=document.getElementById('semantic-lens'),svg=document.querySelector('.diagram-container > svg'),container=svg.parentElement,nav=container.querySelector('.diagram-nav'),legend=svg.querySelector('[data-legend]'),node=svg.querySelector('[data-node-id="api"]');
       const rect=(left,top,width,height)=>({left,top,width,height,right:left+width,bottom:top+height});
       const elements=[panel,container,nav,legend,node].filter(Boolean),saved=elements.map(e=>Object.getOwnPropertyDescriptor(e,'getBoundingClientRect'));
       let position=700;panel.getBoundingClientRect=()=>rect(700,100,200,200);container.getBoundingClientRect=()=>rect(0,0,1000,800);

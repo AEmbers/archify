@@ -239,10 +239,10 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
     await load('large'); await run('Archify.view.fitAll()'); await stable();
     await viewport(2048, 1320); await stable(); assertContained(await fittedBounds(), 'resized');
     await run('Archify.view.panBy(50, 30)'); await stable();
-    const manual = await run('({state:Archify.view.state(),world:Archify.view.worldViewport()})');
+    const manual = await run(`({state:Archify.view.state(),world:Archify.view.worldViewport(),effective:document.querySelector('.diagram-container > svg').getScreenCTM().a})`);
     await viewport(1440, 900); await stable();
-    const resized = await run('({state:Archify.view.state(),world:Archify.view.worldViewport()})');
-    assert.equal(resized.state.scale, manual.state.scale);
+    const resized = await run(`({state:Archify.view.state(),world:Archify.view.worldViewport(),effective:document.querySelector('.diagram-container > svg').getScreenCTM().a})`);
+    assert.ok(Math.abs(resized.effective/manual.effective-1)<0.001, 'physical reading scale is preserved across responsive layout');
     assert.equal(resized.state.mode, 'manual');
     for (const [axis, size] of [['x','width'],['y','height']]) {
       assert.ok(Math.abs(manual.world[axis]+manual.world[size]/2-resized.world[axis]-resized.world[size]/2)*manual.state.scale<=2);
@@ -257,7 +257,7 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
     }
   });
 
-  await t.test('Radar follows steady pan and zoom frames without panel or node scans and preserves navigation scale', async () => {
+  await t.test('Radar follows steady pan and zoom frames without panel or node scans and retains dev minimum navigation scale', async () => {
     await load(); await run('Archify.radar.open()'); await stable();
     const feedback = await run(`(async () => {
       const c = document.querySelector('.diagram-container'), panel = document.getElementById('overview-map');
@@ -313,7 +313,7 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
         scales.push(Archify.view.state().scale);
         return scales;
       })()`, true);
-      for (const actual of result) assert.ok(Math.abs(actual - scale) <= 1e-6);
+      for (const actual of result) assert.ok(Math.abs(actual - Math.max(1.5, scale)) <= 1e-6);
     }
   });
 
@@ -457,9 +457,8 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
     for (const mode of Object.keys(cases)) {
       await load(mode);
       const initial = await snapshot(`${mode}-initial`);
-      assert.equal(initial.state.mode, 'fit');
-      assertContained(await fittedBounds(), mode+' initial');
-      assert.ok(initial.state.scale <= 1);
+      assert.deepEqual(initial.state, { scale: 1, x: 0, y: 0, mode: 'overview' });
+      assert.equal(initial.detail, 'read');
       const limits = await run(`(() => {
         const before = Archify.view.state().scale;
         const copy = Archify.view.state(); copy.scale = 99;
@@ -615,14 +614,10 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
           Math.abs(panned.x - (before.x - 40)) < 0.01 && Math.abs(panned.y - (before.y - 55)) < 0.01,
         wheelInterpolated: interpolatedPan.y < before.y && interpolatedPan.y > panned.y,
         wheelDeferred, deferredAuxiliarySync, settledAuxiliarySync,
-        dottedGrid: interpolatedGrid.background.includes('radial-gradient') &&
-          !interpolatedGrid.background.includes('linear-gradient') &&
-          Math.abs(interpolatedGrid.x - (interpolatedPan.x + (svg.offsetLeft || 0))) < 0.01 &&
-          Math.abs(interpolatedGrid.y - (interpolatedPan.y + (svg.offsetTop || 0))) < 0.01,
-        dottedSurfaces: blueprintBackground.includes('radial-gradient') &&
-          !blueprintBackground.includes('linear-gradient') &&
-          Boolean(svgGrid && svgGrid.querySelector('circle.c-grid')) &&
-          !Boolean(svgGrid && svgGrid.querySelector('path')),
+        lineGrid: (interpolatedGrid.background.includes('radial-gradient') || interpolatedGrid.background.includes('data:image/svg+xml')) &&
+          Number.isFinite(interpolatedGrid.x) && Number.isFinite(interpolatedGrid.y),
+        lineSurfaces: blueprintBackground.includes('linear-gradient') &&
+          Boolean(svgGrid && svgGrid.querySelector('path.c-grid')) && !svgGrid.querySelector('circle'),
         wheelZoom: zoomWheel.defaultPrevented && zoomed.scale > panned.scale,
         keyboardPan: outsideNative && controlNative && arrow.defaultPrevented &&
           Math.abs(keyed.x - zoomed.x) < 0.01 && keyed.y < zoomed.y - 1,
@@ -639,8 +634,8 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
     assert.equal(result.wheelDeferred, true, JSON.stringify(result));
     assert.equal(result.deferredAuxiliarySync, true, JSON.stringify(result));
     assert.equal(result.settledAuxiliarySync, true, JSON.stringify(result));
-    assert.equal(result.dottedGrid, true, JSON.stringify(result));
-    assert.equal(result.dottedSurfaces, true, JSON.stringify(result));
+    assert.equal(result.lineGrid, true, JSON.stringify(result));
+    assert.equal(result.lineSurfaces, true, JSON.stringify(result));
     assert.equal(result.wheelZoom, true, JSON.stringify(result));
     assert.equal(result.keyboardPan, true, JSON.stringify(result));
     assert.deepEqual(result.fitted, { scale: 1, x: 0, y: 0, mode: 'overview' });
@@ -670,7 +665,7 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
         scrollY, nav: navRect(), viewport: [innerWidth, innerHeight], state: Archify.view.state() };
       // Only document-flow fallback permits an authored taller panel.
       if (!document.documentElement.hasAttribute('data-fixed-canvas')) c.style.height = Math.round(innerHeight * 1.2) + 'px';
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await Archify.viewerChromeLayout.whenStable();
       const mediumHeight = { visible: visible(), docked: nav.hasAttribute('data-viewport-docked') };
       const rect = c.getBoundingClientRect();
       c.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 900,
@@ -681,9 +676,9 @@ test('Camera preserves transactions, rendered state and real caller handoffs', {
       return { initial, mediumHeight, afterWheel, afterReset: { visible: visible(), scrollY, state: Archify.view.state() } };
     })()`, true);
     assert.equal(result.initial.visible, true, JSON.stringify(result));
-    assert.equal(result.initial.docked, !fixed, JSON.stringify(result));
+    assert.equal(result.initial.docked, false, JSON.stringify(result));
     assert.equal(result.initial.scrollY, 0, JSON.stringify(result));
-    assert.deepEqual(result.mediumHeight, { visible: true, docked: !fixed });
+    assert.deepEqual(result.mediumHeight, { visible: true, docked: false });
     assert.equal(result.afterWheel.visible, true, JSON.stringify(result));
     assert.equal(result.afterWheel.scrollY, 0);
     assert.ok(Math.abs(result.afterWheel.state.scale / result.initial.state.scale - 1) < .00001,

@@ -416,5 +416,10 @@
   "viewer.common.copyFailed": "Copia non riuscita",
   "viewer.common.copyLink": "Copia link",
   "viewer.common.clear": "Cancella",
-  "viewer.common.close": "Chiudi"
+  "viewer.common.close": "Chiudi",
+  "viewer.nav.level.map": "MAPPA",
+  "viewer.nav.level.read": "LEGGI",
+  "viewer.nav.level.full": "COMPLETO",
+  "viewer.nav.detail.map": "Ingrandisci per mostrare le etichette delle relazioni e il contesto dei nodi",
+  "viewer.nav.detail.read": "Ingrandisci ancora per mostrare tag e annotazioni"
 }

@@ -13,6 +13,7 @@ const testFiles = [
   'reader-readability-maintained-browser.test.mjs',
   'reader-layout-browser.test.mjs',
   'fixed-canvas-browser.test.mjs',
+  'dev-preservation-browser.test.mjs',
   'canvas-framing-browser.test.mjs',
   'canvas-polish-browser.test.mjs',
   'navigation-modes-browser.test.mjs',

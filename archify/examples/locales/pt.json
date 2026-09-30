@@ -416,5 +416,10 @@
   "viewer.common.copyFailed": "Falha ao copiar",
   "viewer.common.copyLink": "Copiar link",
   "viewer.common.clear": "Limpar",
-  "viewer.common.close": "Fechar"
+  "viewer.common.close": "Fechar",
+  "viewer.nav.level.map": "MAPA",
+  "viewer.nav.level.read": "LEITURA",
+  "viewer.nav.level.full": "COMPLETO",
+  "viewer.nav.detail.map": "Amplie para revelar rótulos de relações e contexto do nó",
+  "viewer.nav.detail.read": "Amplie novamente para revelar tags e anotações"
 }

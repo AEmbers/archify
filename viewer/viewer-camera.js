@@ -7,18 +7,13 @@
       var resetPercentLabel = resetBtn.querySelector('[data-view-percent]');
       var inBtn = container.querySelector('[data-view="in"]');
       var fitAllBtn = container.querySelector('[data-view="fit-all"]');
-      var navigation = container.querySelector('.diagram-nav');
       var MIN_SCALE = 0.25;
       var MAX_SCALE = 4;
       var minimumScale = MIN_SCALE;
       var canvasGeometry = null;
-      var initialFraming = true;
-      // Only a temporary bridge while outside the fixed desktop layout.
-      var fixedReading = null;
       var CAMERA_LIMIT = 1000000;
       var grid = document.createElement('div');
       var gridScale = null;
-      var gridFixed = null;
       var state = { scale: 1, x: 0, y: 0, mode: 'overview' };
       var drag = null;
       var spacePan = false;
@@ -43,7 +38,6 @@
       var wheelPanTarget = null;
       var wheelPanInputEnded = false;
       var suppressContextMenuUntil = 0;
-      var lastControlKey = '';
       var interactionMetrics = { offsetLeft: 0, offsetTop: 0 };
 
       var viewBox = svg.viewBox && svg.viewBox.baseVal;
@@ -51,6 +45,32 @@
       grid.className = 'infinite-canvas-grid';
       grid.setAttribute('aria-hidden', 'true');
       container.insertBefore(grid, svg);
+      function syncGridPaint() {
+        var classic = document.documentElement.getAttribute('data-preset') === 'classic';
+        if (classic) grid.style.removeProperty('background-image');
+        else {
+          var source = svg.querySelector('#grid .c-grid');
+          if (source) {
+            var copy = source.cloneNode(true);
+            var paint = getComputedStyle(source);
+            copy.removeAttribute('class');
+            ['stroke', 'fill', 'opacity', 'stroke-dasharray'].forEach(function (name) {
+              copy.setAttribute(name, paint.getPropertyValue(name));
+            });
+            var tile = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            tile.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            tile.setAttribute('width', '40'); tile.setAttribute('height', '40');
+            tile.setAttribute('viewBox', '0 0 40 40'); tile.appendChild(copy);
+            grid.style.backgroundImage = 'url("data:image/svg+xml,' + encodeURIComponent(tile.outerHTML) + '")';
+          }
+        }
+        gridScale = null;
+        if (canvasGeometry) syncGrid();
+      }
+      syncGridPaint();
+      if (window.MutationObserver) new MutationObserver(syncGridPaint).observe(document.documentElement,
+        { attributes: true, attributeFilter: ['data-theme', 'data-preset'] });
+
 
       function boundPosition(value) {
         return Math.max(-CAMERA_LIMIT, Math.min(CAMERA_LIMIT, Number(value) || 0));
@@ -72,8 +92,9 @@
       function contentMetrics() {
         if (!viewBox || !Number.isFinite(viewBox.width) || !Number.isFinite(viewBox.height) ||
             viewBox.width <= 0 || viewBox.height <= 0) return null;
-        var width = svg.clientWidth || 1;
-        var height = svg.clientHeight || 1;
+        var css = getComputedStyle(svg);
+        var width = parseFloat(css.width) || svg.clientWidth || 1;
+        var height = parseFloat(css.height) || svg.clientHeight || 1;
         var scale = Math.min(width / viewBox.width, height / viewBox.height);
         return {
           width: width,
@@ -106,8 +127,7 @@
         var top = Math.max(innerTop, screenTop) + (parseFloat(style.paddingTop) || 0) - originY;
         var right = Math.min(innerLeft + container.clientWidth, screenRight) - (parseFloat(style.paddingRight) || 0) - originX;
         var bottom = Math.min(innerTop + container.clientHeight, screenBottom) - (parseFloat(style.paddingBottom) || 0) - originY;
-        var fixed = document.documentElement.hasAttribute('data-fixed-canvas');
-        var scale = Math.min(fixed ? 1 : MAX_SCALE, (right - left - 32) / (viewBox.width * metrics.scale),
+        var scale = Math.min(MAX_SCALE, (right - left - 32) / (viewBox.width * metrics.scale),
           (bottom - top - 32) / (viewBox.height * metrics.scale));
         var fit = Number.isFinite(scale) && scale > 0 ? {
           scale: scale,
@@ -115,7 +135,7 @@
           y: (top + bottom) / 2 - (metrics.offsetY + viewBox.height * metrics.scale / 2) * scale,
           mode: 'fit'
         } : null;
-        return { fixed: fixed, metrics: metrics, originX: originX, originY: originY, left: left, top: top, right: right, bottom: bottom, fit: fit };
+        return { metrics: metrics, originX: originX, originY: originY, containerLeft: rect.left, containerTop: rect.top, left: left, top: top, right: right, bottom: bottom, fit: fit };
       }
       function readingAt(geometry) {
         var metrics = geometry.metrics;
@@ -135,30 +155,16 @@
           mode: reading.mode
         };
       }
-      function refreshGeometry() {
+      function refreshGeometry(preserveReading) {
         var previous = canvasGeometry;
         var next = measureCanvas();
-        // Reconstructing an SVG origin from its transformed DOMRect introduces
-        // subpixel rounding. It is not a layout change or a new reading anchor.
-        var changed = previous && next && (previous.fixed !== next.fixed ||
-          Math.abs(previous.left - next.left) > 0.01 || Math.abs(previous.right - next.right) > 0.01 ||
-          Math.abs(previous.top - next.top) > 0.01 || Math.abs(previous.bottom - next.bottom) > 0.01 ||
-          previous.metrics.scale !== next.metrics.scale);
-        if (changed && previous.fixed && !next.fixed && state.mode !== 'semantic' && state.mode !== 'fit') {
-          fixedReading = readingAt(previous);
-        }
-        if (next && next.fixed && next.fit) {
-          if (initialFraming || (changed && state.mode === 'fit')) {
-            state = next.fit;
-            initialFraming = false;
-          } else if (changed && state.mode !== 'semantic') {
-            var reading = !previous.fixed && fixedReading ? fixedReading : readingAt(previous);
-            if (reading) {
-              stopCameraMotion('layout', false);
-              restoreReading(reading, next);
-            }
-          }
-          fixedReading = null;
+        if (preserveReading !== false && previous && next && state.mode === 'manual' && !mobileScrollMode() &&
+            (previous.metrics.width !== next.metrics.width || previous.metrics.height !== next.metrics.height ||
+             Math.abs((previous.right-previous.left)-(next.right-next.left)) > .01 ||
+             Math.abs((previous.bottom-previous.top)-(next.bottom-next.top)) > .01)) {
+          var reading = readingAt(previous);
+          stopCameraMotion('layout', false);
+          restoreReading(reading, next);
         }
         canvasGeometry = next;
         minimumScale = next && next.fit ? Math.min(MIN_SCALE, next.fit.scale) : MIN_SCALE;
@@ -208,20 +214,29 @@
         if (resetPercentLabel && resetPercentLabel.textContent !== percent) resetPercentLabel.textContent = percent;
         return percent;
       }
+      function detailLevel() {
+        if (state.mode === 'semantic') return 'full';
+        if (state.scale >= 1.75) return 'full';
+        if (state.scale >= 1) return 'read';
+        return 'map';
+      }
       function renderControls() {
         var semantic = state.mode === 'semantic' && state.scale > 1.01;
-        var detail = 'full';
+        var detail = detailLevel();
         var percent = renderPercent();
-        var controlKey = [state.mode, semantic, detail, percent].join('|');
-        if (controlKey === lastControlKey) return;
-        lastControlKey = controlKey;
-        var detailHint = viewerText('viewer.nav.detail.full');
-        var resolvedLevel = semantic ? viewerText('viewer.nav.level.auto') : '';
-        var showDetailLevel = semantic;
+        var levelLabel = viewerText('viewer.nav.level.' + detail);
+        var detailHint = detail === 'map'
+          ? viewerText('viewer.nav.detail.map')
+          : detail === 'read'
+            ? viewerText('viewer.nav.detail.read')
+            : viewerText('viewer.nav.detail.full');
+        var resolvedLevel = semantic ? viewerText('viewer.nav.level.auto') : levelLabel;
+        var showDetailLevel = semantic || detail !== 'read';
         if (resetDetailLabel) {
           resetDetailLabel.textContent = resolvedLevel;
           resetDetailLabel.hidden = !showDetailLevel;
         }
+        if (resetPercentLabel) resetPercentLabel.textContent = percent;
         resetBtn.toggleAttribute('data-detail-visible', showDetailLevel);
         resetBtn.title = viewerText('viewer.nav.camera.title', {
           semantic: semantic ? viewerText('viewer.nav.camera.semantic') : '',
@@ -235,22 +250,20 @@
       }
       function clipToViewport(camera) {
         camera = camera || state;
-        var fixed = document.documentElement.hasAttribute('data-fixed-canvas') && canvasGeometry;
-        if (!fixed && camera.scale <= 1.001) {
-          if (svg.style.clipPath) svg.style.removeProperty('clip-path');
+        if (camera.scale <= 1.001) {
+          svg.style.removeProperty('clip-path');
           return;
         }
-        var width = fixed ? canvasGeometry.metrics.width : (svg.clientWidth || 1);
-        var height = fixed ? canvasGeometry.metrics.height : (svg.clientHeight || 1);
+        var width = svg.clientWidth || 1;
+        var height = svg.clientHeight || 1;
         var scale = camera.scale;
-        var top = Math.max(0, Math.min(height, ((fixed ? canvasGeometry.top : 0) - camera.y) / scale));
-        var left = Math.max(0, Math.min(width, ((fixed ? canvasGeometry.left : 0) - camera.x) / scale));
-        var right = Math.max(0, Math.min(width, width - ((fixed ? canvasGeometry.right : width) - camera.x) / scale));
-        var bottom = Math.max(0, Math.min(height, height - ((fixed ? canvasGeometry.bottom : height) - camera.y) / scale));
-        var nextClip = 'inset(' + [top, right, bottom, left].map(function (value) {
+        var top = Math.max(0, Math.min(height, -camera.y / scale));
+        var left = Math.max(0, Math.min(width, -camera.x / scale));
+        var right = Math.max(0, Math.min(width, width - (width - camera.x) / scale));
+        var bottom = Math.max(0, Math.min(height, height - (height - camera.y) / scale));
+        svg.style.clipPath = 'inset(' + [top, right, bottom, left].map(function (value) {
           return Math.round(value * 1000) / 1000 + 'px';
         }).join(' ') + ')';
-        if (svg.style.clipPath !== nextClip) svg.style.clipPath = nextClip;
       }
       function cameraSettled(rendered) {
         return Math.abs(rendered.scale - state.scale) < 0.001 &&
@@ -279,8 +292,7 @@
         if (options.interactive === true) {
           if (clipFrame) cancelAnimationFrame(clipFrame);
           clipFrame = 0;
-          if (document.documentElement.hasAttribute('data-fixed-canvas')) clipToViewport(state);
-          else svg.style.removeProperty('clip-path');
+          clipToViewport(state);
           renderPercent();
           if (Archify.radar && typeof Archify.radar.syncViewport === 'function') Archify.radar.syncViewport();
           return;
@@ -299,24 +311,17 @@
         }
       }
       function syncGrid(offsetLeft, offsetTop) {
-        offsetLeft = Number.isFinite(offsetLeft) ? offsetLeft : (svg.offsetLeft || 0);
-        offsetTop = Number.isFinite(offsetTop) ? offsetTop : (svg.offsetTop || 0);
-        container.style.setProperty('--archify-grid-x', (state.x + offsetLeft) + 'px');
-        container.style.setProperty('--archify-grid-y', (state.y + offsetTop) + 'px');
-        var fixed = document.documentElement.hasAttribute('data-fixed-canvas');
-        if (gridScale === state.scale && gridFixed === fixed) return;
-        gridScale = state.scale; gridFixed = fixed;
-        var spacing = 24 * state.scale;
-        var weight = 1;
-        if (fixed) {
-          // Nested world-space lattices share an origin. At a level boundary
-          // the outgoing half-spacing layer is the incoming full-spacing one.
-          spacing *= Math.pow(2, Math.ceil(Math.log2(1 / state.scale)));
-          weight = 2 - spacing / 24;
+        var metrics = canvasGeometry ? canvasGeometry.metrics : contentMetrics();
+        if (!metrics) return;
+        var originX = canvasGeometry ? canvasGeometry.originX - canvasGeometry.containerLeft : offsetLeft || 0;
+        var originY = canvasGeometry ? canvasGeometry.originY - canvasGeometry.containerTop : offsetTop || 0;
+        container.style.setProperty('--archify-grid-x', (originX + state.x + metrics.offsetX * state.scale) + 'px');
+        container.style.setProperty('--archify-grid-y', (originY + state.y + metrics.offsetY * state.scale) + 'px');
+        var spacing = (document.documentElement.getAttribute('data-preset') === 'classic' ? 20 : 40 * metrics.scale) * state.scale;
+        if (spacing !== gridScale) {
+          gridScale = spacing;
+          container.style.setProperty('--archify-grid-minor', spacing + 'px');
         }
-        container.style.setProperty('--archify-grid-minor', spacing + 'px');
-        container.style.setProperty('--archify-grid-major', (5 * spacing) + 'px');
-        container.style.setProperty('--archify-grid-weight', String(weight));
       }
       function scheduleInteractionApply() {
         if (interactionFrame) return;
@@ -525,9 +530,10 @@
         container.removeAttribute('data-camera-transaction');
       }
       function interruptCamera(reason) {
-        initialFraming = false;
-        fixedReading = null;
         flushInteractionApply();
+        // A new gesture owns the currently painted viewport, even if a layout
+        // observer has not yet delivered its resize notification.
+        refreshGeometry(false);
         var rendered = sampleRenderedState();
         stopCameraMotion(reason || 'manual', false);
         state = rendered;
@@ -565,8 +571,8 @@
         options.discrete = true;
         refreshGeometry();
         var geometry = canvasGeometry;
-        var centerX = geometry && geometry.fixed ? (geometry.left + geometry.right) / 2 : (svg.clientWidth || 1) / 2;
-        var centerY = geometry && geometry.fixed ? (geometry.top + geometry.bottom) / 2 : (svg.clientHeight || 1) / 2;
+        var centerX = geometry ? (geometry.left + geometry.right) / 2 : (svg.clientWidth || 1) / 2;
+        var centerY = geometry ? (geometry.top + geometry.bottom) / 2 : (svg.clientHeight || 1) / 2;
         zoomAtLocal(next, centerX, centerY, options);
       }
       function zoomAt(next, clientX, clientY, options) {
@@ -602,8 +608,6 @@
         return true;
       }
       function reset(options) {
-        initialFraming = false;
-        fixedReading = null;
         options = options || {};
         if (options.automatic !== true) interruptCamera();
         else stopCameraMotion('reset', false);
@@ -700,16 +704,6 @@
           top = Math.max(top, visibleTop + padding);
           bottom = Math.min(bottom, visibleBottom - Math.max(padding, 72));
         }
-        var fixedCanvas = document.documentElement.hasAttribute('data-fixed-canvas');
-        if (fixedCanvas) {
-          var geometry = measureCanvas();
-          if (geometry) {
-            left = geometry.left + padding;
-            right = geometry.right - padding;
-            top = geometry.top + padding;
-            bottom = geometry.bottom - padding;
-          }
-        }
         var chip = document.getElementById('focus-chip');
         if (chip && !chip.hidden) {
           var lensEnd = chip.offsetLeft + chip.offsetWidth + 24 - (svg.offsetLeft || 0);
@@ -726,13 +720,9 @@
         var maxScale = options.maxScale || (options.includeNeighbors ? 1.9 : 2.15);
         var targetScale = Math.min((right - left) / bounds.width, (bottom - top) / bounds.height) * 0.9;
         targetScale = Math.min(maxScale, targetScale);
-        // Fixed SVG units can exceed the visible stage. Keep sub-100% fits
-        // precise, including selections whose fit is smaller than one percent.
-        if (!fixedCanvas || targetScale >= 1) {
-          targetScale = Math.max(1, targetScale);
-          if (targetScale < 1.08) targetScale = 1;
-          targetScale = Math.round(targetScale * 100) / 100;
-        }
+        targetScale = Math.max(1, targetScale);
+        if (targetScale < 1.08) targetScale = 1;
+        targetScale = Math.round(targetScale * 100) / 100;
         var target = {
           scale: targetScale,
           x: 0,
@@ -786,8 +776,6 @@
         return transaction;
       }
       function reveal(ids, options) {
-        initialFraming = false;
-        fixedReading = null;
         options = options || {};
         if (window.innerWidth > 720) return frameDesktop(ids, options);
         stopCameraMotion('replaced', false);
@@ -831,32 +819,6 @@
       }
       function pinControls() {
         container.style.setProperty('--archify-scroll-x', container.scrollLeft + 'px');
-      }
-      function syncNavigationDock() {
-        if (!navigation) return;
-        var rect = container.getBoundingClientRect();
-        var margin = window.innerWidth <= 720 ? 8 : 16;
-        var viewportEdge = window.innerHeight - margin;
-        var wasDocked = navigation.hasAttribute('data-viewport-docked');
-        // Older document shells retain Chrome Layout's reserved rail and lift.
-        // The fixed-canvas shell uses this viewport dock only in its fallback.
-        var docked = Boolean(document.getElementById('diagram-notes')) && !document.documentElement.hasAttribute('data-fixed-canvas') && !mobileScrollMode() && rect.top < viewportEdge &&
-          (rect.bottom > viewportEdge || (wasDocked && rect.bottom > 0));
-        var changed = wasDocked !== docked;
-        navigation.toggleAttribute('data-viewport-docked', docked);
-        if (docked) {
-          var visibleRight = Math.min(rect.right, window.innerWidth);
-          navigation.style.setProperty('--archify-nav-viewport-right', Math.max(margin, window.innerWidth - visibleRight + margin) + 'px');
-        } else {
-          navigation.style.removeProperty('--archify-nav-viewport-right');
-        }
-        if (changed && Archify.radar && typeof Archify.radar.sync === 'function') Archify.radar.sync();
-      }
-      function resetNavigationDockLatch() {
-        if (!navigation) return;
-        navigation.removeAttribute('data-viewport-docked');
-        navigation.style.removeProperty('--archify-nav-viewport-right');
-        syncNavigationDock();
       }
       function onScroll() {
         pinControls();
@@ -1020,21 +982,14 @@
       container.addEventListener('blur', leaveCanvas);
       container.addEventListener('scroll', onScroll, { passive: true });
       window.addEventListener('scroll', function () {
-        refreshGeometry();
-        syncNavigationDock();
+        refreshGeometry(false);
         if (Archify.radar) Archify.radar.sync();
       }, { passive: true });
-      window.addEventListener('afterprint', function () {
-        requestAnimationFrame(function () {
-          requestAnimationFrame(resetNavigationDockLatch);
-        });
-      });
       function onGeometryChange() {
         if (resizeFrame) cancelAnimationFrame(resizeFrame);
         resizeFrame = requestAnimationFrame(function () {
           resizeFrame = 0;
-          syncNavigationDock();
-          if (state.mode === 'fit') fitAll({ automatic: true });
+            if (state.mode === 'fit') fitAll({ automatic: true });
           else if (state.mode === 'semantic') syncSemantic();
           else apply();
         });
@@ -1049,7 +1004,6 @@
       if (Archify.viewerChromeLayout && Archify.viewerChromeLayout.measure) Archify.viewerChromeLayout.measure();
       apply();
       pinControls();
-      requestAnimationFrame(syncNavigationDock);
       requestAnimationFrame(syncSemantic);
 
       return {

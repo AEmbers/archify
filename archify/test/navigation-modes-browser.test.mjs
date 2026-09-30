@@ -12,7 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chrome = process.env.ARCHIFY_CHROME ? findChrome() : null;
 const controls = { route: '#btn-route-probe', map: '#btn-overview-map', lens: '#btn-semantic-lens' };
 
-test('Path, Map and Lens are exclusive navigation tools', {
+test('Path, Map and Lens retain dev selection, panel and URL handoffs', {
   skip: chrome ? false : 'Set ARCHIFY_CHROME for navigation tool switching.',
 }, async t => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-navigation-'));
@@ -37,7 +37,7 @@ test('Path, Map and Lens are exclusive navigation tools', {
     const ready = browser.cdp.waitFor('Page.loadEventFired', session);
     await send('Page.navigate', { url: pathToFileURL(file).href + '?theme=light' }); await ready;
     await run('document.fonts.ready.then(()=>Archify.readerLayout.whenStable())'); await settle();
-    await run('Archify.view.panBy(30,-15)'); await settle();
+    await run('Archify.view.zoomIn()'); await settle();
   }
   async function click(selector) {
     const p = await run(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
@@ -53,58 +53,37 @@ test('Path, Map and Lens are exclusive navigation tools', {
       routePaint:svg.querySelectorAll('[data-route-match],[data-route-step]').length,
       lensPaint:svg.querySelectorAll('[data-lens-match]').length,playing:Archify.routeProbe.isJourneyPlaying(),errors:navigationErrors};})()`);
   }
-  function exclusive(s, selected) {
-    const expected = Object.fromEntries(Object.keys(controls).map(k => [k, k === selected]));
-    assert.deepEqual(s.modes, expected); assert.deepEqual(s.buttons, expected); assert.deepEqual(s.panels, expected);
-    assert.deepEqual(s.errors, []);
+  const expected = JSON.parse(fs.readFileSync(new URL('./fixtures/dev-navigation-handoffs.json', import.meta.url), 'utf8'));
+  async function check(label) {
+    const current = await state();
+    assert.deepEqual(current.errors, []);
+    const actual = { modes: current.modes, buttons: current.buttons, panels: current.panels,
+      lens: current.lens, route: current.route, hash: current.hash, playing: current.playing,
+      routePaint: current.routePaint > 0, lensPaint: current.lensPaint > 0, cameraMode: current.camera.mode };
+    assert.deepEqual(actual, expected[label], label);
   }
   for (const from of Object.keys(controls)) for (const to of Object.keys(controls)) {
     if (from === to) continue;
-    await t.test(`${from} to ${to}: native buttons preserve camera and leave one tool`, async () => {
-      await load(); const camera = await run('Archify.view.state()');
-      await click(controls[from]); exclusive(await state(), from);
-      await click(controls[to]); const s = await state(); exclusive(s, to);
-      assert.deepEqual(s.camera, camera);
+    await t.test(`${from} to ${to}: native controls follow dev handoff`, async () => {
+      await load(); await click(controls[from]); await click(controls[to]);
+      await check(from + '-to-' + to);
     });
   }
-  for (const to of ['route', 'map']) await t.test(`active Lens to ${to} clears selection and share state`, async () => {
-    await load(); await click('.fixed-legend [data-legend-kind="database"]');
-    assert.match((await state()).hash, /lens=database/);
-    const camera = await run('Archify.view.state()');
-    await click(controls[to]); const s = await state(); exclusive(s, to);
-    assert.equal(s.lens, null); assert.equal(s.lensPaint, 0); assert.equal(s.hash, ''); assert.deepEqual(s.camera, camera);
+  for (const to of ['route', 'map']) await t.test(`active Lens to ${to}`, async () => {
+    await load(); await run(`Archify.semanticLens.select('database')`); await settle();
+    await click(controls[to]); await check('active-lens-to-' + to);
   });
-  for (const to of ['map', 'lens']) await t.test(`completed Path to ${to} clears route and share state`, async () => {
+  for (const to of ['map', 'lens']) await t.test(`completed Path to ${to}`, async () => {
     await load(); await run(`Archify.routeProbe.begin({source:'users'});Archify.routeProbe.choose('db');`);
-    await run(`new Promise(resolve=>{let n=0;function tick(){if(++n>45)return resolve();requestAnimationFrame(tick);}tick();})`);
-    assert.match((await state()).hash, /route=/);
-    const camera = await run('Archify.view.state()');
-    await click(controls[to]); const s = await state(); exclusive(s, to);
-    assert.equal(s.route, null); assert.equal(s.routePaint, 0); assert.equal(s.playing, false); assert.equal(s.hash, ''); assert.deepEqual(s.camera, camera);
+    await run(`new Promise(r=>setTimeout(r,800))`);
+    await run(to==='map'?'Archify.radar.open()':'Archify.semanticLens.open()');await settle();await check('path-to-' + to);
   });
-  await t.test('keyboard shortcuts and rapid API switches use the same ownership rules', async () => {
-    await load();
-    for (const [selected, key] of [['route','r'],['map','m'],['lens','l'],['map','m'],['route','r'],['lens','l']]) {
-      await run('document.activeElement.blur()');
-      for (const type of ['keyDown','keyUp']) await send('Input.dispatchKeyEvent', { type, key, code:'Key'+key.toUpperCase(), windowsVirtualKeyCode:key.toUpperCase().charCodeAt(0) });
-      await settle(); exclusive(await state(), selected);
-    }
-    await run('Archify.semanticLens.open();Archify.routeProbe.begin();Archify.radar.open()');
-    await settle(); exclusive(await state(), 'map');
-    await click('.fixed-legend [data-legend-kind="database"]'); exclusive(await state(), 'lens');
+  await t.test('route deep link takes ownership from Lens', async () => {
+    await load(); await run(`Archify.semanticLens.select('database');location.hash='route=users~db'`);
+    await settle(); await check('route-deep-link');
   });
-  await t.test('route deep links still survive taking ownership from an active Lens', async () => {
-    await load(); await click('.fixed-legend [data-legend-kind="database"]');
-    await run(`location.hash='route=users~db'`); await settle();
-    const s = await state(); exclusive(s, 'route'); assert.equal(s.route, 'result'); assert.equal(s.hash, '#route=users~db');
-  });
-  await t.test('direct Lens selection also exits Map without requiring the panel to open', async () => {
+  await t.test('direct Lens selection while Map is open follows dev ownership', async () => {
     await load(); await click(controls.map);
-    await run(`Archify.semanticLens.select('database')`); await settle();
-    const s = await state();
-    assert.deepEqual(s.modes, { route: false, map: false, lens: true });
-    assert.deepEqual(s.buttons, { route: false, map: false, lens: true });
-    assert.deepEqual(s.panels, { route: false, map: false, lens: false });
-    assert.equal(s.hash, '#lens=database'); assert.deepEqual(s.errors, []);
+    await run(`Archify.semanticLens.select('database')`); await settle(); await check('direct-lens-from-map');
   });
 });

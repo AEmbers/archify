@@ -11,7 +11,7 @@ const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const chrome = process.env.ARCHIFY_CHROME ? findChrome() : null;
 if (process.env.ARCHIFY_CHROME && !chrome) throw new Error('ARCHIFY_CHROME is not executable');
 
-test('real browser page zoom selects canvas or document flow from the resulting CSS viewport', {
+test('real browser page zoom preserves the reader and switches legend at the mobile breakpoint', {
   skip: chrome ? false : 'Set ARCHIFY_CHROME to check real browser page zoom.',
 }, async (t) => {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-browser-zoom-'));
@@ -73,12 +73,11 @@ test('real browser page zoom selects canvas or document flow from the resulting 
           assert.ok(Math.abs(observation.dpr - factor) < 0.01, 'Chrome must actually apply page zoom: ' + JSON.stringify(observation));
           assert.equal(observation.pinch, 1, 'pinch zoom must remain inactive');
           assert.equal(observation.camera.scale, 1, 'each page-zoom observation uses an explicit 100% diagram reset');
-          assert.equal(observation.fixed, observation.css[0] >= 1024 && observation.css[1] >= 600);
+          assert.equal(observation.fixed, false);
           assert.equal(observation.cards, 3);
-          assert.equal(observation.dockVisible, observation.fixed);
-          assert.equal(observation.legendVisible, !observation.fixed);
-          if (observation.fixed) assert.ok(observation.rootRange.every(value => value <= 1), JSON.stringify(observation));
-          else assert.ok(observation.cardsHeight > 0, 'document fallback must restore cards');
+          assert.equal(observation.dockVisible, observation.css[0] > 720);
+          assert.equal(observation.legendVisible, observation.css[0] <= 720);
+          assert.ok(observation.rootRange[0] <= 1, 'no horizontal page overflow');
           if (round === 0 && evidence) {
             const screenshot = await send('Page.captureScreenshot', { format: 'png' });
             fs.writeFileSync(path.join(evidence, `browser-zoom-${factor * 100}-${width}.png`), Buffer.from(screenshot.data, 'base64'));
@@ -92,6 +91,6 @@ test('real browser page zoom selects canvas or document flow from the resulting 
     const zoomed = records.find(row => row.factor === 2 && row.round === 0 && row.requestedWindow[0] === width);
     assert.ok(Math.abs(baseline.css[0] / zoomed.css[0] - 2) < 0.02, JSON.stringify({ baseline, zoomed }));
   }
-  assert.ok(records.some(row => row.factor === 2 && row.fixed));
-  assert.ok(records.some(row => row.factor === 2 && !row.fixed));
+  assert.ok(records.some(row => row.factor === 2 && row.dockVisible));
+  assert.ok(records.some(row => row.factor === 2 && !row.dockVisible));
 });

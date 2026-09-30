@@ -132,7 +132,7 @@ async function finalGeometry(browser, sessionId) {
         Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
     }
     var container = document.querySelector('.diagram-container');
-    var legend = document.querySelector('[data-legend]');
+    var legend = container.hasAttribute('data-fixed-legend') ? container.querySelector('.fixed-legend') : container.querySelector('[data-legend]');
     var nav = document.querySelector('.diagram-nav');
     var svg = container && container.querySelector(':scope > svg');
     var lens = document.getElementById('semantic-lens');
@@ -296,8 +296,8 @@ test('Dock Safe Rail keeps typed renderers clear across themes, Presentation, an
       assert.equal(receipt.dockStageIntersectionArea, 0, message);
       assert.ok(receipt.scrollWidth <= receipt.innerWidth, message);
       assert.ok(receipt.navBottom <= receipt.containerBottom + 0.5, message);
-      // Desktop cards occupy a sidebar; short windows retain document flow.
-      if (entry.present || (entry.width >= 1024 && entry.height >= 600)) {
+      // Normal reading retains dev document flow; Presentation fits the viewport.
+      if (entry.present) {
         assert.ok(receipt.scrollHeight <= receipt.innerHeight, message);
       }
       // An automatic overview can be smaller than the reading threshold.
@@ -413,7 +413,7 @@ test('a real 5px Legend gap keeps the stage rail and Legend clear', {
     const sessionId = await load(browser, render('architecture', CASES.architecture));
     await evaluate(browser, sessionId, `(function () {
       var container = document.querySelector('.diagram-container');
-      var legend = document.querySelector('[data-legend]');
+      var legend = container.hasAttribute('data-fixed-legend') ? container.querySelector('.fixed-legend') : container.querySelector('[data-legend]');
       var nav = document.querySelector('.diagram-nav');
       var legendRect = legend.getBoundingClientRect();
       var containerRect = container.getBoundingClientRect();
@@ -441,7 +441,7 @@ test('Presentation keeps its visible Dock clear of a colliding Legend', {
     const sessionId = await load(browser, render('architecture', CASES.architecture), { query: '?present=1' });
     await evaluate(browser, sessionId, `(function () {
       var container = document.querySelector('.diagram-container');
-      var legend = document.querySelector('[data-legend]');
+      var legend = container.hasAttribute('data-fixed-legend') ? container.querySelector('.fixed-legend') : container.querySelector('[data-legend]');
       var nav = document.querySelector('.diagram-nav');
       var legendRect = legend.getBoundingClientRect();
       var containerRect = container.getBoundingClientRect();
@@ -593,7 +593,7 @@ test('live camera transitions keep authored relationship paint outside the Dock 
 
       assert.deepEqual(result.hits, [], `${scenario.name}: ${JSON.stringify(result.hits)}`);
       if (scenario.clearsClip) {
-        assert.match(result.clipPath, /^inset\(/, `${scenario.name}: fixed canvas retains the visible stage clip`);
+        assert.equal(result.clipPath, '', `${scenario.name}: dev overview restores the authored stage`);
       }
     }
   } finally {
@@ -953,8 +953,8 @@ test('Chrome Layout preserves scheduling, mode restoration and Reader handoffs',
         await resize(width);
         const current = await state(`threshold-${width}-${observations.length}`);
         assert.equal(current.geometry.receiptEligible, width > 720);
-        assert.equal(current.reader, null);
-        assert.equal(current.fixed, width >= 1024);
+        assert.equal(current.reader, width >= 1024 ? 'adaptive' : null);
+        assert.equal(current.fixed, false);
         assert.equal(current.viewBox, initial.viewBox);
         if (width <= 720) zero(current);
         else clearStage(current);

@@ -1,4 +1,3 @@
-import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,7 +17,7 @@ if (chromeConfigured && !chromePath) {
 // queue/worker gap 105px. Readability must not rely on detached label masks.
 const fixtureJson = path.join(root, 'test/fixtures/reader-readability/synthetic-wide.architecture.json');
 
-test('document-shell declared wide synthetic reader preserves geometry and reaches edge/node readability', {
+test('declared wide synthetic reader preserves geometry and reaches edge/node readability', {
   skip: chromePath ? false :
     'Set ARCHIFY_CHROME to run the maintained real browser regression.',
 }, async () => {
@@ -29,7 +28,6 @@ test('document-shell declared wide synthetic reader preserves geometry and reach
       path.join(root, 'bin', 'archify.mjs'), 'deliver', 'architecture', fixtureJson, artifact,
       '--quality', 'showcase',
     ], { cwd: root, stdio: 'pipe' });
-    useDocumentReader(artifact);
     const artifactSource = fs.readFileSync(artifact, 'utf8');
     const svgStart = artifactSource.indexOf('<svg');
     const svgEnd = artifactSource.indexOf('</svg>', svgStart) + '</svg>'.length;
@@ -109,7 +107,7 @@ test('document-shell declared wide synthetic reader preserves geometry and reach
             overflowX: Math.max(html.scrollWidth, document.body.scrollWidth) > innerWidth,
             // Bottom notes and index sit below the fold by design.
             overflowY: Math.max(html.scrollHeight, document.body.scrollHeight) - (html.getAttribute('data-reader-rail') === 'bottom'
-              ? document.querySelector('.reader-rail').getBoundingClientRect().height + parseFloat(getComputedStyle(document.querySelector('.reader-rail')).marginTop)
+              ? document.getElementById('reader-rail').getBoundingClientRect().height + parseFloat(getComputedStyle(document.getElementById('reader-rail')).marginTop)
               : 0) > innerHeight + 1,
             theme: html.getAttribute('data-theme'), motion: html.getAttribute('data-motion'),
             motionMode: Archify.motionGovernor.mode(), detailLevel: container.getAttribute('data-detail-level'),
@@ -141,7 +139,7 @@ test('document-shell declared wide synthetic reader preserves geometry and reach
           assert.equal(state.theme, theme, JSON.stringify(state));
           assert.equal(state.motionMode, 'still', JSON.stringify(state));
           if (state.motion !== null) assert.equal(state.motion, 'still', JSON.stringify(state));
-          assert.equal(state.detailLevel, 'full', JSON.stringify(state));
+          assert.equal(state.detailLevel, 'read', JSON.stringify(state));
           assert.equal(state.cameraScale, 1, JSON.stringify(state));
           assert.equal(state.viewPercent, '100%', JSON.stringify(state));
           assert.ok(Number.isFinite(state.chromeStageIntersectionArea));

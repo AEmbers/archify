@@ -416,5 +416,10 @@
   "viewer.common.copyFailed": "Не удалось скопировать",
   "viewer.common.copyLink": "Скопировать ссылку",
   "viewer.common.clear": "Очистить",
-  "viewer.common.close": "Закрыть"
+  "viewer.common.close": "Закрыть",
+  "viewer.nav.level.map": "КАРТА",
+  "viewer.nav.level.read": "ЧТЕНИЕ",
+  "viewer.nav.level.full": "ПОЛНЫЙ",
+  "viewer.nav.detail.map": "Увеличьте, чтобы увидеть подписи связей и контекст узлов",
+  "viewer.nav.detail.read": "Увеличьте ещё, чтобы увидеть теги и аннотации"
 }

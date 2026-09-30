@@ -1,4 +1,3 @@
-import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -31,7 +30,7 @@ test('document-shell Reader Layout settles when card height depends on the reade
     path.join(skillRoot, 'test/fixtures/architecture-viewport/portrait-cards.architecture.json'),
     output,
   ]);
-  useDocumentReader(output);
+
   const browser = new ChromeVisualBrowser(chromePath);
   try {
     const session = await browser.sessionPromise;

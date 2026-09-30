@@ -416,5 +416,10 @@
   "viewer.common.copyFailed": "Échec de la copie",
   "viewer.common.copyLink": "Copier le lien",
   "viewer.common.clear": "Effacer",
-  "viewer.common.close": "Fermer"
+  "viewer.common.close": "Fermer",
+  "viewer.nav.level.map": "CARTE",
+  "viewer.nav.level.read": "LIRE",
+  "viewer.nav.level.full": "COMPLET",
+  "viewer.nav.detail.map": "Zoomez pour révéler les libellés des relations et le contexte des nœuds",
+  "viewer.nav.detail.read": "Zoomez à nouveau pour révéler les étiquettes et annotations"
 }

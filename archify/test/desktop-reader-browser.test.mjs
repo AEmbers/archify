@@ -1,4 +1,3 @@
-import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -67,14 +66,7 @@ test('default sequence and dataflow canvases fit the real desktop reader without
         if (authored) candidate.meta.viewBox = viewBox;
         fs.writeFileSync(input, JSON.stringify(candidate));
         execFileSync(process.execPath, [path.join(skillRoot, 'bin/archify.mjs'), 'render', type, input, artifact]);
-        const canvas = await runVisualCheck({ artifactPath: artifact, chromePath });
-        assert.equal(canvas.exitCode, 0, `${type}: fixed canvas ${JSON.stringify(canvas.receipt.diagnostics)}`);
-        assert.ok(canvas.receipt.containment.viewports.every(v => v.ok && !v.verticalScrollAccepted));
-        if (authored) assert.ok(fs.readFileSync(artifact, 'utf8').includes(`viewBox="0 0 ${viewBox.join(' ')}"`));
-        const documentArtifact = path.join(tmp, `${type}-${authored}-document.html`);
-        fs.copyFileSync(artifact, documentArtifact);
-        useDocumentReader(documentArtifact);
-        const result = await runVisualCheck({ artifactPath: documentArtifact, chromePath });
+        const result = await runVisualCheck({ artifactPath: artifact, chromePath });
         if (authored) {
           assert.equal(result.exitCode, 1, `${type}: explicit narrow canvas still requires repair`);
           assert.ok(result.receipt.diagnostics.some(({ code }) => code === 'viewer/viewport-overflow'));
@@ -188,7 +180,6 @@ test('production showcase is readable in the real 1440 by 900 adaptive reader', 
       'showcase',
     ], { cwd: skillRoot, encoding: 'utf8' });
 
-    useDocumentReader(artifact);
     const artifactSource = fs.readFileSync(artifact, 'utf8');
     const svgRoot = artifactSource.match(/<svg\b[^>]*>/)?.[0];
     assert.ok(svgRoot, 'production fixture must contain an SVG root');
@@ -212,8 +203,11 @@ test('production showcase is readable in the real 1440 by 900 adaptive reader', 
       ));
       for (const observation of [desktop, darkDesktop]) {
         assert.ok(observation);
-        assert.ok(observation.readerWidth <= DESKTOP_READABILITY_VIEWPORT.width);
-        assert.ok(observation.diagramWidth >= 930);
+        assert.equal(observation.readerWidth, 1376);
+        assert.ok(observation.readerWidth <= 1376);
+        assert.equal(observation.diagramWidth, 1346);
+        assert.equal(observation.viewBoxWidth, 1376);
+        assert.ok(Number.isFinite(observation.minimumProjectedNodeTextPx));
         assert.ok(observation.minimumProjectedNodeTextPx >= MIN_PROJECTED_NODE_TEXT_PX);
         assert.ok(observation.minimumProjectedNodeTextPx >= 7.5, JSON.stringify(observation));
         assert.equal(typeof observation.minimumProjectedNodeText, 'string');
@@ -256,7 +250,6 @@ test('route-expanded intrinsic architecture preserves reading size with ordinary
       '--json',
     ], { cwd: skillRoot, encoding: 'utf8' });
 
-    useDocumentReader(artifact);
     const html = fs.readFileSync(artifact, 'utf8');
     const svgRoot = html.match(/<svg\b[^>]*>/)?.[0];
     assert.ok(svgRoot, 'expected an SVG root');
@@ -315,7 +308,6 @@ test('extreme intrinsic architecture keeps readable page scroll below first-scre
       '--json',
     ], { cwd: skillRoot, encoding: 'utf8' });
 
-    useDocumentReader(artifact);
     const html = fs.readFileSync(artifact, 'utf8');
     const svgRoot = html.match(/<svg\b[^>]*>/)?.[0];
     assert.ok(svgRoot, 'expected an SVG root');
@@ -361,7 +353,7 @@ test('extreme intrinsic architecture keeps readable page scroll below first-scre
   }
 });
 
-test('fixed desktop canvas contains offline workflows without rewriting pinned geometry', {
+test('offline intrinsic workflows fit while authored overflow still identifies lane frames', {
   skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
 }, async () => {
   const fixtureRoot = path.join(skillRoot, 'test/fixtures/workflow-viewport');
@@ -403,10 +395,16 @@ test('fixed desktop canvas contains offline workflows without rewriting pinned g
           }
         },
       });
-      assert.equal(result.exitCode, 0, JSON.stringify(result.receipt));
-      assert.equal(result.receipt.containment.status, 'pass');
       if (name === 'order-pinned-overflow') {
-        assert.match(fs.readFileSync(artifact, 'utf8'), /viewBox="0 0 860 786"/);
+        assert.equal(result.exitCode, 1);
+        const diagnostic = result.receipt.diagnostics.find(({ code }) => code === 'viewer/viewport-overflow');
+        assert.ok(diagnostic, JSON.stringify(result.receipt));
+        assert.equal(diagnostic.evidence.workflowLanes[0].frameId, 'lane-0');
+        assert.equal(diagnostic.evidence.workflowLanes[0].nodeCount, 12);
+        assert.ok(diagnostic.evidence.workflowLanes[0].spaceAboveNodesPx > 100);
+      } else {
+        assert.equal(result.exitCode, 0, JSON.stringify(result.receipt));
+        assert.equal(result.receipt.containment.status, 'pass');
       }
     }
   } finally {
@@ -460,7 +458,7 @@ test('issue #250 tall intrinsic workflow fits every required desktop viewport', 
   }
 });
 
-test('issue #250 five-stage stack preserves source geometry and readability in the fixed canvas', {
+test('issue #250 five-stage stack fits below source scale without crossing the readability floor', {
   skip: chromePath ? false : 'Set ARCHIFY_CHROME to run the real browser regression.',
 }, async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-issue-250-five-stage-'));
@@ -489,8 +487,7 @@ test('issue #250 five-stage stack preserves source geometry and readability in t
       width === DESKTOP_READABILITY_VIEWPORT.width && height === DESKTOP_READABILITY_VIEWPORT.height
     ));
     assert.ok(desktop);
-    assert.ok(desktop.diagramWidth > 0 && desktop.diagramWidth < desktop.innerWidth, JSON.stringify(desktop, null, 2));
-    assert.ok(desktop.viewBoxWidth > 0);
+    assert.ok(desktop.diagramWidth < desktop.viewBoxWidth, JSON.stringify(desktop, null, 2));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -515,7 +512,6 @@ test('authored Architecture canvas keeps its scale and accepts readable document
   };
   fs.writeFileSync(input, JSON.stringify(doc));
   execFileSync(process.execPath, [path.join(skillRoot, 'bin/archify.mjs'), 'render', 'architecture', input, artifact]);
-  useDocumentReader(artifact);
   const html = fs.readFileSync(artifact, 'utf8');
   assert.match(html, /viewBox="0 0 1040 700"/);
   assert.match(html, /<rect x="300" y="470" width="140" height="64"/);

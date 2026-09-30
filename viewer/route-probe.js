@@ -787,13 +787,12 @@
         options = options || {};
         if (html.getAttribute('data-embed') === 'true') return false;
         if (Archify.semanticLens && typeof Archify.semanticLens.clearPreview === 'function') Archify.semanticLens.clearPreview();
-        if (Archify.semanticLens && (Archify.semanticLens.active() || Archify.semanticLens.isOpen())) {
+        if (Archify.semanticLens && Archify.semanticLens.active()) {
           Archify.semanticLens.clear({ updateUrl: false, preserveView: true, closePanel: true });
         }
         var focused = options.source || (Archify.focus && typeof Archify.focus.active === 'function' ? Archify.focus.active() : null);
         if (Array.isArray(focused)) focused = null;
-        var hash = new URLSearchParams(location.hash.replace(/^#/, ''));
-        clear({ updateUrl: options.updateUrl !== false && (hash.has('route') || hash.has('lens')), preserveView: true, restoreFocus: false });
+        clear({ updateUrl: false, preserveView: true, restoreFocus: false });
         if (Archify.intentTrace && typeof Archify.intentTrace.clear === 'function') Archify.intentTrace.clear({ announce: false });
         if (Archify.focus && typeof Archify.focus.clear === 'function') {
           Archify.focus.clear({ updateUrl: false, preserveView: true });
@@ -933,7 +932,7 @@
           if (parts.length !== 2) return;
           var byId = nodesById();
           if (!byId[parts[0]] || !byId[parts[1]]) return;
-          begin({ source: parts[0], focusNode: false, updateUrl: false });
+          begin({ source: parts[0], focusNode: false });
           choose(parts[1], { updateUrl: false });
         } catch (_) {}
       }

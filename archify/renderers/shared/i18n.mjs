@@ -197,8 +197,6 @@ const MESSAGE_PAIRS = {
 
   'viewer.guide.title': ['Explore this system', '探索此系统'],
   'viewer.guide.canvas': ['Click or Tab into the canvas. Pan with right-drag, middle-drag, or Space + left-drag. Scroll or use arrow keys to pan; Ctrl/Cmd + scroll zooms at the pointer. Reset with 0.', '点击画布或用 Tab 进入。右键、中键或空格＋左键拖动平移；滚轮或方向键平移；Ctrl/Cmd＋滚轮以指针为中心缩放。按 0 重置。'],
-  'viewer.notes.title': ['Diagram notes', '图示说明'],
-  'viewer.notes.close': ['Close diagram notes', '关闭图示说明'],
   'viewer.nav.fitAll': ['Fit entire diagram', '适应全部'],
   'viewer.nav.fitAll.short': ['FIT', '全图'],
   'viewer.focus.selectedNodes': ['{count} selected nodes', '已选择 {count} 个节点'],
@@ -453,6 +451,11 @@ const MESSAGE_PAIRS = {
   'viewer.nav.camera': ['{hint}. Reset diagram view', '{hint}。重置图表视图'],
   'viewer.nav.camera.title': ['{semantic}{hint} · reset view (0)', '{semantic}{hint} · 重置视图（0）'],
   'viewer.nav.camera.semantic': ['Semantic camera active · ', '语义相机已启用 · '],
+  'viewer.nav.level.map': ['MAP', '概览'],
+  'viewer.nav.level.read': ['READ', '阅读'],
+  'viewer.nav.level.full': ['FULL', '完整'],
+  'viewer.nav.detail.map': ['Zoom in to reveal relationship labels and node context', '放大以显示关系标签和节点上下文'],
+  'viewer.nav.detail.read': ['Zoom in again to reveal tags and annotations', '再次放大以显示标签和注释'],
   'viewer.nav.level.auto': ['AUTO', '自动'],
   'viewer.nav.detail.full': ['Full diagram detail', '完整图表详情'],
 

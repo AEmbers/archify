@@ -416,5 +416,10 @@
   "viewer.common.copyFailed": "Kopieren fehlgeschlagen",
   "viewer.common.copyLink": "Link kopieren",
   "viewer.common.clear": "Löschen",
-  "viewer.common.close": "Schließen"
+  "viewer.common.close": "Schließen",
+  "viewer.nav.level.map": "KARTE",
+  "viewer.nav.level.read": "LESEN",
+  "viewer.nav.level.full": "VOLL",
+  "viewer.nav.detail.map": "Vergrößern, um Beziehungslabels und Knotenkontext anzuzeigen",
+  "viewer.nav.detail.read": "Erneut vergrößern, um Tags und Anmerkungen anzuzeigen"
 }

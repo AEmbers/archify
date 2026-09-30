@@ -1562,8 +1562,7 @@
 
       installRelationshipHitTargets();
 
-      function syncFocusFromHash(options) {
-        options = options || {};
+      function syncFocusFromHash() {
         try {
           var params = new URLSearchParams(location.hash.replace(/^#/, ''));
           var relation = params.get('relation');
@@ -1571,7 +1570,7 @@
           var reach = params.get('reach');
           if (relation) {
             if (html.getAttribute('data-embed') === 'true' ||
-                !inspectRelationshipById(relation, { updateUrl: false, toggle: false })) clear({ updateUrl: false, preserveView: options.preserveView === true });
+                !inspectRelationshipById(relation, { updateUrl: false, toggle: false })) clear({ updateUrl: false });
           }
           else if (initial) {
             if (set(initial, { updateUrl: false, toggle: false }) &&
@@ -1579,12 +1578,12 @@
               applyReachability(reach, { updateUrl: false, toggle: false, reveal: false });
             }
           }
-          else clear({ updateUrl: false, preserveView: options.preserveView === true });
+          else clear({ updateUrl: false });
         } catch (_) {}
       }
 
       window.addEventListener('hashchange', syncFocusFromHash);
-      syncFocusFromHash({ preserveView: true });
+      syncFocusFromHash();
 
       return {
         set: set,

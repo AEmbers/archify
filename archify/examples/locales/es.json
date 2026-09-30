@@ -433,8 +433,11 @@
   "viewer.common.clear": "Borrar",
   "viewer.common.close": "Cerrar",
   "viewer.guide.canvas": "Haz clic o usa Tab para entrar al lienzo. Arrastra con el botón derecho, central o Espacio + botón izquierdo. Desplázate con la rueda o las flechas; Ctrl/Cmd + rueda amplía en el puntero. Pulsa 0 para restablecer.",
-  "viewer.notes.title": "Notas del diagrama",
-  "viewer.notes.close": "Cerrar notas del diagrama",
   "viewer.nav.fitAll": "Ajustar todo el diagrama",
-  "viewer.nav.fitAll.short": "AJUSTAR"
+  "viewer.nav.fitAll.short": "AJUSTAR",
+  "viewer.nav.level.map": "MAPA",
+  "viewer.nav.level.read": "LEER",
+  "viewer.nav.level.full": "COMPLETO",
+  "viewer.nav.detail.map": "Acerca para revelar las etiquetas de relación y el contexto de los nodos",
+  "viewer.nav.detail.read": "Acerca de nuevo para revelar etiquetas y anotaciones"
 }

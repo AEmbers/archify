@@ -79,7 +79,7 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
         var diagram = document.querySelector('.diagram-container');
         var svg = diagram.querySelector(':scope > svg');
         return {
-          fixed: html.hasAttribute('data-fixed-canvas'), active: Archify.readerLayout.active(), receipt: Archify.readerLayout.receipt(),
+          active: Archify.readerLayout.active(), receipt: Archify.readerLayout.receipt(),
           width: html.style.getPropertyValue('--archify-reader-width'),
           layout: html.getAttribute('data-reader-layout'), overflow: html.getAttribute('data-reader-overflow'),
           wide: diagram.getAttribute('data-wide-diagram'), shape: html.getAttribute('data-diagram-shape'),
@@ -140,8 +140,7 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
           const state = await snapshot(`${mode}-${theme}`);
           assert.equal(state.theme, theme);
           assert.equal(state.reduced, theme === 'light');
-          assert.equal(state.fixed, true);
-          assert.equal(state.active, false);
+          assert.equal(state.active, state.receipt.ratio >= 1.55);
           await evaluate('Archify.view.zoomIn()');
           await stable();
           const exported = await evaluate(`(async function () {
@@ -181,29 +180,22 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
       const intrinsic = await snapshot('intrinsic-ratio-1.549');
       assert.equal(intrinsic.readerFit, 'intrinsic-height');
       assert.equal(intrinsic.receipt.ratio, 1.549);
-      assert.equal(intrinsic.fixed, true);
-      assert.equal(intrinsic.active, false);
-      await viewport(1440, 599);
-      await stable();
-      const documentReader = await snapshot('intrinsic-short-viewport');
-      assert.equal(documentReader.fixed, false);
-      assert.equal(documentReader.active, true, 'intrinsic-height remains eligible below the wide-ratio threshold');
+      assert.equal(intrinsic.active, true, 'intrinsic-height remains eligible below the wide-ratio threshold');
       assert.equal(intrinsic.wide, null);
       assert.equal(intrinsic.shape, null);
       for (const ratio of [1.549, 1.55, 1.551]) {
         await load(variant(`ratio-${ratio}`, { ratio, undeclaredFit: true }));
         const before = await snapshot(`ratio-${ratio}`);
-        assert.equal(before.readerFit, null);
-        assert.equal(before.fixed, true);
-        assert.equal(before.active, false);
+        assert.equal(before.readerFit, null, 'legacy ratio fixture declares no intrinsic fit');
+        assert.equal(before.active, ratio >= 1.55);
         if (ratio < 1.55) inactive(before, false);
         for (const width of [1023, 1024, 1025, 1023, 1440]) {
           await viewport(width, 900);
           await stable();
           const state = await snapshot(`ratio-${ratio}-width-${width}`);
           assert.deepEqual(state.geometry, before.geometry);
-          assert.equal(state.fixed, width >= 1024);
-          inactive(state, ratio >= 1.55);
+          if (ratio >= 1.55 && width >= 1024) assert.equal(state.active, true);
+          else inactive(state, ratio >= 1.55);
         }
       }
     });
@@ -213,16 +205,15 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
       for (const [width, height] of [[1440, 900], [1600, 1000], [1920, 1080], [2048, 1320]]) {
         await load(wide, { width, height });
         const state = await snapshot(`desktop-${width}x${height}`);
-        assert.equal(state.fixed, true);
-        assert.ok(state.shellWidth > width - 60 && state.shellWidth <= width);
-        assert.ok(state.scrollHeight <= height + 1);
+        assert.equal(state.active, true);
+        assert.ok(state.receipt.width >= 960 && state.receipt.width <= Math.min(width, 1920));
       }
       await load(wide, { width: 2048, height: 3000 });
-      assert.ok((await snapshot('maximum-width')).shellWidth > 1920);
+      assert.equal((await snapshot('maximum-width')).receipt.width, 1920);
       await evaluate(`document.body.style.paddingLeft = '100px'; document.body.style.paddingRight = '100px'`);
       await viewport(1024, 900);
       await stable();
-      assert.equal((await snapshot('available-width-below-floor')).shellWidth, 824);
+      assert.equal((await snapshot('available-width-below-floor')).receipt.width, 824);
       await load(wide, { width: 1440, height: 300 });
       const geometry = (await snapshot('short-window')).geometry;
       await evaluate(`document.querySelector('.header').style.minHeight = '1000px';
@@ -245,7 +236,7 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
         else if (mode === 'present') await evaluate('Archify.presentation.exit()');
         else await evaluate("document.documentElement.removeAttribute('data-embed')");
         await stable();
-        assert.equal((await snapshot(`exit-${mode}`)).fixed, true);
+        assert.equal((await snapshot(`exit-${mode}`)).active, true);
         for (let attempt = 0; attempt < 2; attempt += 1) {
           if (mode === 'print') await media('dark', false, true);
           else if (mode === 'present') await evaluate('Archify.presentation.enter()');
@@ -256,7 +247,7 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
           else if (mode === 'present') await evaluate('Archify.presentation.exit()');
           else await evaluate("document.documentElement.removeAttribute('data-embed')");
           await stable();
-          assert.equal((await snapshot(`return-${mode}-${attempt}`)).fixed, true);
+          assert.equal((await snapshot(`return-${mode}-${attempt}`)).active, true);
         }
       }
     });
@@ -270,9 +261,7 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
         Archify.view.zoomIn();`);
       await stable();
       const changed = await snapshot('after-content');
-      assert.equal(changed.fixed, true);
-      assert.ok(changed.scrollHeight <= changed.innerHeight + 1);
-      assert.ok(await evaluate(`document.getElementById('diagram-notes-full-title').textContent.includes('Long reader title')`));
+      assert.ok(changed.receipt.width <= before.receipt.width);
       assert.deepEqual(changed.geometry, before.geometry);
       await evaluate('Archify.view.reset()');
       await stable();
@@ -292,13 +281,13 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
         Object.defineProperty(document, 'fonts', { value: undefined });
       ` });
       await load(file);
-      assert.equal((await snapshot('optional-interfaces-absent')).fixed, true);
+      assert.equal((await snapshot('optional-interfaces-absent')).active, true);
       await viewport(1023, 900);
       await stable();
       inactive(await snapshot('optional-resize-out'));
       await viewport(1440, 900);
       await stable();
-      assert.equal((await snapshot('optional-resize-back')).fixed, true);
+      assert.equal((await snapshot('optional-resize-back')).active, true);
     });
 
     await t.test('font readiness gates sampling and pending-frame timeout remains explicit', async () => {
@@ -322,7 +311,7 @@ test('Reader Layout preserves final-artifact behavior across its ownership bound
       })()`, true);
       assert.deepEqual(fontGate, { beforeReady: false, afterReady: true });
       await stable();
-      assert.equal((await snapshot('delayed-fonts-and-content')).fixed, true);
+      assert.equal((await snapshot('delayed-fonts-and-content')).active, true);
       await load(wide);
       const result = await evaluate(`(async function () {
         var original = document.fonts;

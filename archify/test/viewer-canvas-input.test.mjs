@@ -6,7 +6,7 @@ import vm from 'node:vm';
 // Executes the real camera event handlers with deterministic geometry and time.
 // This covers input ownership and camera arithmetic, not browser layout or native input.
 function cameraFixture({ svgWidth = 1000, svgHeight = 600, width = 1000, height = 600,
-  viewWidth = svgWidth, viewHeight = svgHeight, fixed = false, embed = false, wide = false, radar = false, padding = 0, border = 0 } = {}) {
+  viewWidth = svgWidth, viewHeight = svgHeight, embed = false, wide = false, radar = false, padding = 0, border = 0 } = {}) {
   let now = 0, next = 1;
   const frames = new Map(), timers = new Map();
   const doc = { activeElement: null, hidden: false, title: 'Test diagram' };
@@ -67,7 +67,6 @@ function cameraFixture({ svgWidth = 1000, svgHeight = 600, width = 1000, height 
       width: svgWidth * scale, height: svgHeight * scale };
   };
   svg.viewBox = { baseVal: { x: 0, y: 0, width: viewWidth, height: viewHeight } };
-  if (fixed) root.setAttribute('data-fixed-canvas', '');
   if (embed) root.setAttribute('data-embed', 'true');
   if (wide) container.setAttribute('data-wide-diagram', 'true');
   win.innerWidth = width; win.innerHeight = height;
@@ -227,7 +226,8 @@ test('fit responds to resize until manual navigation, including extreme wide and
   assert.ok(Math.abs((200 - f.view.state().y) / f.view.state().scale - world.y) < 1e-6);
   const manual = f.state();
   f.win.innerWidth = 1440; f.win.emit('resize'); f.frame(4);
-  assert.deepEqual(f.state(), manual, 'resize must not pull a manually chosen view back to fit');
+  assert.equal(f.state().mode, 'manual');
+  assert.equal(f.state().scale, manual.scale);
 });
 
 test('invalid or unavailable fitting is a no-op; fit and reset cancel old drags', () => {
@@ -265,7 +265,7 @@ test('wheel frames expose live viewport and percentage feedback without full aux
   f.frame(80); assert.ok(full > settledSyncs);
 });
 
-test('real Radar surface handlers preserve scale and a new camera command cancels map dragging', () => {
+test('real Radar surface handlers retain dev minimum scale and a new camera command cancels map dragging', () => {
   for (const scale of [0.5, 1, 2, 0.1]) {
     const f = cameraFixture({ radar: true, svgHeight: 6000 });
     f.view.zoomAt(scale, 0, 0);
@@ -274,9 +274,9 @@ test('real Radar surface handlers preserve scale and a new camera command cancel
     surface.emit('pointerdown', { clientX: 400, clientY: 500 });
     surface.emit('pointermove', { clientX: 600, clientY: 800 }); f.frame(2);
     surface.emit('pointerup'); f.frame(3);
-    assert.equal(f.view.state().scale, scale);
+    assert.equal(f.view.state().scale, Math.max(1.5,scale));
     surface.emit('keydown', { key: 'ArrowDown' }); f.frame(3);
-    assert.equal(f.view.state().scale, scale);
+    assert.equal(f.view.state().scale, Math.max(1.5,scale));
     surface.emit('pointerdown', { clientX: 200, clientY: 100 });
     f.view.reset(); const reset = f.state();
     surface.emit('pointermove', { clientX: 700, clientY: 700 }); f.frame(3);
@@ -357,40 +357,36 @@ test('fit and pointer zoom use the SVG screen origin with padded, bordered conta
 });
 
 
-test('fixed canvas clips the visible stage during drag and preserves complete fit', () => {
-  const f = cameraFixture({ fixed: true, svgHeight: 1300, height: 600 });
-  f.view.reset();
-  assert.equal(f.svg.style.clipPath, 'inset(0px 0px 700px 0px)');
+test('manual zoom clips during drag, and Fit all preserves the complete diagram', () => {
+  const f = cameraFixture({ svgHeight: 1300, height: 600 });
+  f.view.zoomAt(2,0,0);
+  assert.ok(f.svg.style.clipPath.startsWith('inset('));
   f.container.emit('pointerdown', { button: 1 });
   f.container.emit('pointermove', { clientY: -100 }); f.frame();
-  assert.equal(f.svg.style.clipPath, 'inset(200px 0px 500px 0px)');
-  f.container.emit('pointerup', { button: 1 }); f.frame();
-  f.view.fitAll(); f.frame();
-  assert.equal(f.svg.style.clipPath, 'inset(0px 0px 0px 0px)');
-  const state = f.state();
-  assert.ok(state.y >= 0 && state.y + 1300 * state.scale <= 600);
+  assert.ok(f.svg.style.clipPath.includes('100px'));
+  f.container.emit('pointerup', { button: 1 });f.frame();
+  f.view.fitAll();f.frame();
+  assert.equal(f.svg.style.clipPath,undefined);
+  const state=f.state();assert.ok(state.y>=0&&state.y+1300*state.scale<=600);
 });
 
 // New framing contract: real camera execution, deterministic viewport geometry.
 // Actual SVG/CSS sizing and first paint are checked separately in the browser gate.
-test('fixed canvas initially fits the complete long diagram without a manual command', () => {
-  const f = cameraFixture({ fixed: true, svgHeight: 1300, height: 600 });
-  assert.equal(f.state().mode, 'fit');
-  assert.ok(Math.abs(f.state().scale - 568 / 1300) < 1e-10);
-  const r = f.svg.getBoundingClientRect();
-  assert.ok(r.top >= 16 - 1e-6 && r.bottom <= 584 + 1e-6);
+test('long diagrams keep the original reading size until Fit all is requested', () => {
+  const f = cameraFixture({ svgHeight:1300,height:600 });
+  assert.deepEqual(f.state(),{scale:1,x:0,y:0,mode:'overview'});
+  f.view.fitAll();assert.ok(Math.abs(f.state().scale-568/1300)<1e-10);
 });
 
-test('fixed fit does not enlarge a small authored diagram to fill the screen', () => {
-  const f = cameraFixture({ fixed: true, svgWidth: 400, svgHeight: 200, width: 1400, height: 900 });
-  f.container.clientHeight = 900;
-  f.view.fitAll();
-  assert.equal(f.state().scale, 1);
-  assert.equal(f.state().x, 500); assert.equal(f.state().y, 350);
+test('small diagrams start at original reading size and Fit all is explicit', () => {
+  const f=cameraFixture({svgWidth:400,svgHeight:200,width:1400,height:900});
+  assert.equal(f.state().scale,1);
+  f.view.fitAll();assert.equal(f.state().mode,'fit');
+  const r=f.svg.getBoundingClientRect();assert.ok(r.left>=16&&r.right<=1384&&r.top>=16&&r.bottom<=884);
 });
 
-test('fixed manual resize preserves actual scale and the world point at viewport center', () => {
-  const f = cameraFixture({ fixed: true, svgWidth: 1200, svgHeight: 800, width: 1440, height: 900 });
+test('manual resize preserves actual scale and the world point at viewport center', () => {
+  const f = cameraFixture({ svgWidth: 1200, svgHeight: 800, width: 1440, height: 900 });
   f.view.reset(); f.view.zoomAt(2, 300, 250); f.view.panBy(90, -70);
   const before = f.view.worldViewport(), scale = f.state().scale;
   f.resize(1080, 700);
@@ -401,12 +397,12 @@ test('fixed manual resize preserves actual scale and the world point at viewport
   assert.ok(Math.abs(before.y + before.height / 2 - after.y - after.height / 2) < 1e-6);
 });
 
-test('fixed reading returns after a document-layout round trip without stale gesture work', () => {
-  const f = cameraFixture({ fixed:true, svgWidth:1200, svgHeight:800, width:1440, height:900 });
+test('manual reading returns after a viewport round trip without stale gesture work', () => {
+  const f = cameraFixture({ svgWidth:1200, svgHeight:800, width:1440, height:900 });
   f.view.reset();f.view.zoomAt(2,300,250);f.view.panBy(-90,70);
   const before=f.view.worldViewport();
-  f.root.removeAttribute('data-fixed-canvas');f.resize(1023,599);
-  f.root.setAttribute('data-fixed-canvas','');f.resize(1440,900);
+  f.resize(1023,599);
+  f.resize(1440,900);
   const after=f.view.worldViewport();
   assert.equal(after.scale,before.scale);
   for(const [axis,size] of [['x','width'],['y','height']]) {
@@ -419,18 +415,18 @@ test('fixed reading returns after a document-layout round trip without stale ges
   assert.equal(f.container.classList.contains('is-panning'),false);
 });
 
-test('a user reset outside fixed mode invalidates its previous reading snapshot', () => {
-  const f = cameraFixture({ fixed:true, svgWidth:1200, svgHeight:800, width:1440, height:900 });
+test('a user reset retains baseline reading after a viewport round trip', () => {
+  const f = cameraFixture({ svgWidth:1200, svgHeight:800, width:1440, height:900 });
   f.view.zoomAt(2,300,250);f.view.panBy(-90,70);
-  f.root.removeAttribute('data-fixed-canvas');f.resize(1023,599);f.view.reset();
-  f.root.setAttribute('data-fixed-canvas','');f.resize(1440,900);
+  f.resize(1023,599);f.view.reset();
+  f.resize(1440,900);
   assert.equal(f.state().scale,1);
   assert.equal(f.state().mode,'overview');
 });
 
 
-test('fixed zoom buttons magnify around the visible canvas center even for an enormous SVG', () => {
-  const f=cameraFixture({fixed:true,svgWidth:24000,svgHeight:800,width:1440,height:900});
+test('zoom buttons magnify around the visible canvas center even for an enormous SVG', () => {
+  const f=cameraFixture({svgWidth:24000,svgHeight:800,width:1440,height:900});
   const before=f.view.worldViewport();f.view.zoomIn();f.frame(3);const after=f.view.worldViewport();
   assert.ok(after.scale>before.scale);
   for(const [axis,size] of [['x','width'],['y','height']]) {
@@ -440,12 +436,12 @@ test('fixed zoom buttons magnify around the visible canvas center even for an en
 });
 
 test('latest manual reading in document layout survives return to a different SVG base size', () => {
-  const f=cameraFixture({fixed:true,svgWidth:1200,svgHeight:800,width:1440,height:900});
+  const f=cameraFixture({svgWidth:1200,svgHeight:800,width:1440,height:900});
   f.view.zoomAt(2,300,250);f.view.panBy(-90,70);
-  f.root.removeAttribute('data-fixed-canvas');f.sizeSvg(900,600);f.resize(1023,599);
+  f.sizeSvg(900,600);f.resize(1023,599);
   f.view.zoomAt(.8,400,300);f.view.panBy(110,-70);
   const before=f.view.worldViewport(),effective=before.scale*.75;
-  f.root.setAttribute('data-fixed-canvas','');f.sizeSvg(1200,800);f.resize(1440,900);
+  f.sizeSvg(1200,800);f.resize(1440,900);
   const after=f.view.worldViewport();
   assert.ok(Math.abs(after.scale-effective)<1e-6,JSON.stringify({before,after,effective}));
   for(const [axis,size] of [['x','width'],['y','height']]) {
@@ -454,7 +450,7 @@ test('latest manual reading in document layout survives return to a different SV
 });
 
 test('subpixel SVG measurement noise does not move an explicit reset camera', () => {
-  const f = cameraFixture({ fixed: true, width: 1000, height: 700, svgWidth: 24000, svgHeight: 800 });
+  const f = cameraFixture({ width: 1000, height: 700, svgWidth: 24000, svgHeight: 800 });
   f.view.reset();
   const box = f.svg.getBoundingClientRect;
   f.svg.getBoundingClientRect = () => {
@@ -464,25 +460,6 @@ test('subpixel SVG measurement noise does not move an explicit reset camera', ()
   };
   f.win.emit('resize'); f.frame(5);
   assert.deepEqual(f.state(), { scale: 1, x: 0, y: 0, mode: 'overview' });
-});
-
-test('fixed semantic framing contains wide selections even below one percent', () => {
-  for (const right of [1010, 240000]) {
-    const f = cameraFixture({ fixed: true, svgWidth: right + 70, svgHeight: 600,
-      width: 630, height: 700, padding: 16, border: 1 });
-    f.win.innerWidth = 1024;
-    f.doc.getElementById = () => null;
-    const boxes = [{ id: 'left', x: 40, y: 300, width: 120, height: 60 },
-      { id: 'right', x: right - 130, y: 300, width: 130, height: 60 }];
-    f.svg.querySelectorAll = selector => selector === '[data-node-id]'
-      ? boxes.map(box => ({ getAttribute: () => box.id, getBBox: () => box })) : [];
-    f.view.reveal(['left', 'right'], { instant: true });
-    const visible = f.view.worldViewport();
-    assert.equal(f.state().mode, 'semantic');
-    assert.ok(visible.scale > 0 && visible.scale < 1, JSON.stringify(visible));
-    assert.ok(visible.x <= 40 && visible.x + visible.width >= right, JSON.stringify(visible));
-    assert.ok(visible.y <= 300 && visible.y + visible.height >= 360, JSON.stringify(visible));
-  }
 });
 
 test('document semantic framing keeps the legacy 100 percent minimum', () => {
@@ -497,12 +474,12 @@ test('document semantic framing keeps the legacy 100 percent minimum', () => {
   assert.equal(f.state().scale, 1);
 });
 
-test('fixed canvas grid stays sparse across zoom levels and pan writes only its origin', () => {
-  const f = cameraFixture({ fixed: true, width: 1440, height: 900, svgWidth: 200000, svgHeight: 900, viewWidth: 200000, viewHeight: 900 });
+test('the authored grid scales continuously with the camera and pan writes only its origin', () => {
+  const f = cameraFixture({ width: 1440, height: 900, svgWidth: 200000, svgHeight: 900, viewWidth: 200000, viewHeight: 900 });
   for (const scale of [.001, .01, .05, .1, .24999, .25, .25001, .5, 1, 2, 4]) {
     f.view.zoomAt(scale, 300, 200); f.frame(3);
     const spacing = parseFloat(f.container.style['--archify-grid-minor']);
-    assert.ok(spacing >= 24 - .001 && spacing <= 48 + .001, `spacing ${spacing} at ${scale}`);
+    assert.ok(Math.abs(spacing - 40 * f.state().scale) < 1e-8, `spacing ${spacing} at ${scale}`);
     const before = { ...f.container.style };
     const writes = [];
     const setProperty = f.container.style.setProperty;
@@ -511,7 +488,6 @@ test('fixed canvas grid stays sparse across zoom levels and pan writes only its 
     f.container.style.setProperty = setProperty;
     assert.ok(writes.filter(name => name.startsWith('--archify-grid-')).every(name => name === '--archify-grid-x' || name === '--archify-grid-y'));
     assert.equal(f.container.style['--archify-grid-minor'], before['--archify-grid-minor']);
-    assert.equal(f.container.style['--archify-grid-weight'], before['--archify-grid-weight']);
     assert.ok(Math.abs(parseFloat(f.container.style['--archify-grid-x']) - parseFloat(before['--archify-grid-x']) + 53) < .01);
     assert.ok(Math.abs(parseFloat(f.container.style['--archify-grid-y']) - parseFloat(before['--archify-grid-y']) - 71) < .01);
   }

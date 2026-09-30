@@ -412,11 +412,8 @@
         options = options || {};
         next = Boolean(next);
         if (next && Archify.semanticLens && typeof Archify.semanticLens.clearPreview === 'function') Archify.semanticLens.clearPreview();
-        if (next && Archify.semanticLens && (Archify.semanticLens.active() || Archify.semanticLens.isOpen())) {
-          Archify.semanticLens.clear({ updateUrl: !!Archify.semanticLens.active(), preserveView: true, closePanel: true });
-        }
-        if (next && Archify.routeProbe && Archify.routeProbe.active()) {
-          Archify.routeProbe.clear({ preserveView: true, restoreFocus: false });
+        if (next && Archify.semanticLens && Archify.semanticLens.isOpen()) {
+          Archify.semanticLens.close({ restoreFocus: false });
         }
         requestedOpen = next;
         if (next) {
@@ -486,7 +483,7 @@
       function navigate(event) {
         var point = diagramPoint(event);
         if (!point || !Archify.view || typeof Archify.view.centerAt !== 'function') return;
-        Archify.view.centerAt(point.x, point.y, { preserveScale: true, instant: true,
+        Archify.view.centerAt(point.x, point.y, { minimumScale: 1.5, instant: true,
           defer: true, manual: !viewportDrag });
       }
       function endViewportDrag(event, cancelOnly) {

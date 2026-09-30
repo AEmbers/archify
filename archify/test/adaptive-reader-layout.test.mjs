@@ -125,15 +125,12 @@ test('adaptive width preserves canonical SVG geometry and yields to specialized 
   assert.doesNotMatch(reader, /overflow\s*=\s*['"]hidden/);
 });
 
-test('document-flow fallback remeasures content while author guidance uses the fixed canvas contract', () => {
+test('adaptive reader remeasures content and preserves readable page scrolling', () => {
   assert.match(reader, /document\.fonts\.ready\.then\(schedule\)/);
   assert.match(reader, /new ResizeObserver\(schedule\)/);
   assert.match(reader, /new MutationObserver\(schedule\)/);
   assert.match(reader, /document\.documentElement\.scrollHeight/);
   assert.match(reader, /lastWidth - overflow \* ratio - 4/);
-  assert.match(skill, /fixed viewport canvas at CSS sizes ≥1024×600/);
-  assert.match(skill, /Preserve authored SVG\/viewBox, proportions, geometry and typography/);
-  assert.match(skill, /delivery-contract.md#viewer-containment-and-readability/);
   assert.match(skill, /Automated browser evidence\]\(delivery-contract\.md#automated-browser-evidence\)/);
   assert.match(skill, /intrinsic-height page scroll/);
   const delivery = fs.readFileSync(path.join(skillRoot, 'references/delivery-contract.md'), 'utf8');

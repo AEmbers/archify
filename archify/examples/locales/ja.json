@@ -416,5 +416,10 @@
   "viewer.common.copyFailed": "コピーに失敗しました",
   "viewer.common.copyLink": "リンクをコピー",
   "viewer.common.clear": "クリア",
-  "viewer.common.close": "閉じる"
+  "viewer.common.close": "閉じる",
+  "viewer.nav.level.map": "マップ",
+  "viewer.nav.level.read": "閲覧",
+  "viewer.nav.level.full": "全体",
+  "viewer.nav.detail.map": "拡大すると関係ラベルとノードのコンテキストが表示されます",
+  "viewer.nav.detail.read": "さらに拡大するとタグと注釈が表示されます"
 }

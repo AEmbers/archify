@@ -1,4 +1,3 @@
-import { useDocumentReader } from './helpers/document-reader-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,7 +20,7 @@ test('document-shell automatic architectures preserve primary reading size when 
   const output = path.join(dir, 'output.html');
   fs.writeFileSync(input, JSON.stringify(spec));
   execFileSync(process.execPath, [path.join(root, 'bin/archify.mjs'), 'render', 'architecture', input, output]);
-  useDocumentReader(output);
+
   const browser = new ChromeVisualBrowser(chrome);
   try {
     const session = await browser.sessionPromise;
@@ -142,7 +141,7 @@ test('a document-shell first-screen fit never pushes relationship labels below t
   execFileSync(process.execPath, [path.join(root, 'bin/archify.mjs'), 'render', 'architecture', input, output]);
   const browser = new ChromeVisualBrowser(findChrome());
   try {
-    useDocumentReader(output);
+
     await browser.inspect({ artifactPath: output, width: 1440, height: 900, theme: 'light' });
     const session = await browser.sessionPromise;
     const result = await browser.cdp.send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
