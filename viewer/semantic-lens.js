@@ -189,7 +189,7 @@
         var toggle = document.createElement('button');
         toggle.type = 'button';
         toggle.className = 'fixed-legend-toggle';
-        toggle.textContent = legendSource.querySelector(':scope > text').textContent + ' (' + sources.length + ')';
+        toggle.setAttribute('aria-label', viewerText('viewer.lens.legend'));
         toggle.setAttribute('aria-expanded', 'false');
         toggle.setAttribute('aria-controls', 'fixed-legend-list');
         var list = document.createElement('div');
@@ -215,7 +215,7 @@
           var y = Number(source.getAttribute('data-legend-baseline'));
           var width = Math.max(14, Number(text.getAttribute('x')) - x - 4);
           swatch.setAttribute('viewBox', (x - 2) + ' ' + (y - 14) + ' ' + (width + 4) + ' 20');
-          swatch.style.width = (width + 4) + 'px';
+          swatch.style.width = ((width + 4) * .8) + 'px';
           Array.prototype.forEach.call(source.children, function (child) {
             if (child === text || child.hasAttribute('data-legend-bridge-runtime')) return;
             var copy = child.cloneNode(true);

@@ -4724,24 +4724,28 @@ html[data-share-playback="true"] svg[data-animation="trace"] [data-graph-role="a
   .fixed-legend {
     position: absolute; left: 16px; bottom: 16px; z-index: 13;
     translate: 0 calc(-1 * var(--archify-dock-lift, 0px));
-    display: flex; align-items: flex-start; width: max-content; padding: 3px;
-    border: 1px solid var(--toolbar-border); border-radius: .58rem;
-    background: var(--toolbar-menu-bg); color: var(--toolbar-text);
+    display: flex; align-items: flex-start; width: max-content; padding: 0;
+    color: var(--toolbar-text);
     font-size: 11px; line-height: 1.4;
   }
-  html[data-preset="blueprint"] .fixed-legend { border-radius: .28rem; }
   .fixed-legend[hidden],
   .fixed-legend [hidden] { display: none !important; }
   .diagram-container[data-fixed-legend] > svg [data-legend] { visibility: hidden; }
-  .fixed-legend-list { display: flex; flex-wrap: wrap; gap: 2px 6px; min-width: 0; }
-  .fixed-legend-toggle { flex: none; }
+  .fixed-legend-list { display: flex; flex-wrap: wrap; gap: 0 4px; min-width: 0; }
+  .fixed-legend-toggle { flex: none; width: 24px; justify-content: center; }
+  .fixed-legend-toggle::before {
+    content: ""; width: 5px; height: 5px;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+  }
+  .fixed-legend-toggle[aria-expanded="true"]::before { transform: rotate(135deg); }
   .fixed-legend-entry, .fixed-legend-toggle {
-    display: inline-flex; align-items: center; gap: 5px; min-height: 32px;
-    padding: 3px 5px; margin: 0; border: 1px solid transparent; border-radius: .35rem;
+    display: inline-flex; align-items: center; gap: 3px; min-height: 24px;
+    padding: 1px 3px; margin: 0; border: 1px solid transparent; border-radius: .35rem;
     font: inherit; color: inherit; background: transparent; white-space: nowrap;
   }
   .fixed-legend button { cursor: pointer; }
-  .fixed-legend-entry > svg { flex: none; height: 20px; min-width: 0; max-width: none; margin: 0; overflow: visible; }
+  .fixed-legend-entry > svg { flex: none; height: 16px; min-width: 0; max-width: none; margin: 0; overflow: visible; }
   .fixed-legend-count { font-size: 10px; opacity: .8; font-variant-numeric: tabular-nums; }
   .fixed-legend [data-legend-zero] { opacity: .5; }
   .fixed-legend button:hover { background: var(--toolbar-hover); }
@@ -4750,7 +4754,7 @@ html[data-share-playback="true"] svg[data-animation="trace"] [data-graph-role="a
   .fixed-legend[data-collapsed] .fixed-legend-list {
     position: absolute; left: -1px; bottom: calc(100% + 8px); width: min(28rem, 100% + 16rem);
     max-width: calc(100vw - 64px); overflow-y: auto; overscroll-behavior: contain;
-    padding: 6px; border: 1px solid var(--toolbar-border); border-radius: .58rem;
+    padding: 4px; border: 0; border-radius: .35rem;
     background: var(--toolbar-menu-bg); box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
   }
   .fixed-legend[data-collapsed] .fixed-legend-entry { width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
