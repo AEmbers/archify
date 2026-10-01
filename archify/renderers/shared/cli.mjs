@@ -18,7 +18,7 @@ import {
   removeOwnedRegularFile,
   verifyAtomicOutput,
 } from './atomic-output.mjs';
-import { resolveLocale, translateMessage, registerLocale, englishSourceFor, SUPPORTED_LOCALES } from './i18n.mjs';
+import { resolveLocale, translateMessage, registerLocale, localeDiagnostics } from './i18n.mjs';
 import { prepareDiagramBrandMarks } from './brand-marks.mjs';
 
 const outputPathGuards = new Map();
@@ -26,68 +26,16 @@ let renderCandidateSequence = 0;
 
 // meta.locale is renderer-owned Viewer UI, not authored content. Each message
 // resolves as: valid meta.translations value → bundled catalog enrolled in
-// locales/manifest.json → English (see i18n.mjs). A tag with neither a bundled
-// catalog nor a usable override falls back to the English Viewer chrome.
-// Every fallback is disclosed on stderr unconditionally so render/deliver/
-// validate report it even without ARCHIFY_DIAGNOSTIC_FORMAT.
-function warnLocale(diagnostic) {
-  recordDiagnostic({ severity: 'warning', ...diagnostic });
-  console.warn(`archify: ${diagnostic.message}`);
-}
-
+// locales/manifest.json → English (see i18n.mjs). Every fallback is disclosed
+// on stderr unconditionally so render/deliver/validate report it even without
+// ARCHIFY_DIAGNOSTIC_FORMAT; the CLI receipts carry the same diagnostics.
 function applyLocaleTranslations(diagramType, diagram) {
   const locale = diagram.meta?.locale;
   if (!locale) return;
-  const report = registerLocale(locale, diagram.meta?.translations);
-  const { unknownKeys, placeholderMismatches, appliedKeys } = report.override;
-  const rejected = unknownKeys.length + placeholderMismatches.length;
-  if (rejected) {
-    const kept = report.bundledLocale ? `bundled ${report.bundledLocale} message` : 'English message';
-    warnLocale({
-      code: 'i18n/invalid-translation',
-      message: `meta.translations for locale ${JSON.stringify(locale)} has ${rejected} unusable ${rejected === 1 ? 'entry' : 'entries'} (${unknownKeys.length} unknown, ${placeholderMismatches.length} placeholder mismatch); each keeps its ${kept}.`,
-      subject: { diagramType, path: '/meta/translations' },
-      evidence: {
-        locale,
-        unknownKeys: unknownKeys.slice(0, 10),
-        unknownKeysTotal: unknownKeys.length,
-        placeholderMismatches: placeholderMismatches.slice(0, 10),
-        placeholderMismatchesTotal: placeholderMismatches.length,
-      },
-      supportedFixes: ['Remove each unknown key or rename it to a canonical message key.', 'Use exactly the {placeholders} of the English source string for each mismatched key.'],
-    });
-  }
-  if (report.fallback) {
-    warnLocale({
-      code: 'i18n/locale-fallback',
-      message: `meta.locale ${JSON.stringify(locale)} has no bundled catalog and no usable meta.translations; the Viewer chrome and <html lang> fall back to English.`,
-      subject: { diagramType, path: '/meta/locale' },
-      evidence: { locale, bundledLocales: SUPPORTED_LOCALES },
-      supportedFixes: ['Supply meta.translations for this locale.', `Use a bundled locale: ${SUPPORTED_LOCALES.join(', ')}.`],
-    });
-  } else if (report.fallbackKeys.length) {
-    const source = [
-      report.bundledLocale && `the bundled ${report.bundledLocale} catalog`,
-      appliedKeys && `${appliedKeys} meta.translations ${appliedKeys === 1 ? 'entry' : 'entries'}`,
-    ].filter(Boolean).join(' and ');
-    const missingKeys = report.fallbackKeys.slice(0, 10);
-    warnLocale({
-      code: 'i18n/translation-coverage',
-      message: `meta.locale ${JSON.stringify(locale)} resolves ${report.translatedKeys}/${report.totalKeys} renderer-owned messages (${Math.floor(report.coverage * 100)}%) from ${source}; ${report.fallbackKeys.length} fall back to English.`,
-      subject: { diagramType, path: '/meta/translations' },
-      evidence: {
-        locale,
-        resolvedLocale: report.resolvedLocale,
-        bundledLocale: report.bundledLocale,
-        translatedKeys: report.translatedKeys,
-        totalKeys: report.totalKeys,
-        appliedOverrideKeys: appliedKeys,
-        missingKeys,
-        missingKeysTotal: report.fallbackKeys.length,
-        englishSource: englishSourceFor(missingKeys),
-      },
-      supportedFixes: ['Add each missing key to meta.translations, translating its English source string and keeping its {placeholders}.'],
-    });
+  registerLocale(locale, diagram.meta.translations);
+  for (const diagnostic of localeDiagnostics(diagramType, diagram.meta)) {
+    recordDiagnostic(diagnostic);
+    console.warn(`archify: ${diagnostic.message}`);
   }
 }
 

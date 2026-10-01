@@ -94,8 +94,9 @@ catalog, translate missing keys, and use the English source to check keys and
 placeholders.
 
 An unknown key or a value with mismatched placeholders is rejected and keeps
-the lower-priority message; `validate`/`render`/`deliver` report it as
-`i18n/invalid-translation`. Keys that still resolve to English in a
+the lower-priority message; it is reported as `i18n/invalid-translation` on
+stderr and as a warning in the `validate --json`, `deliver`, and `finalize`
+receipt `diagnostics[]`. Keys that still resolve to English in a
 non-English locale are reported as `i18n/translation-coverage`, with the missing
 keys and their English source text; add exactly those keys to repair the gap.
 Coverage describes the final resolved catalog, not the size of the override.

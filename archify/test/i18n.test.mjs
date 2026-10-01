@@ -681,6 +681,52 @@ test('a document override never mutates the reusable bundled catalog', () => {
   assert.equal(translateMessage('es', 'viewer.common.close'), before, 'a later document without overrides reuses the bundled catalog');
 });
 
+function cliJson(args) {
+  const result = spawnSync(process.execPath, [cli, ...args], { cwd: tmp, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return JSON.parse(result.stdout);
+}
+
+test('validate and deliver receipts carry locale warnings as structured diagnostics without failing', () => {
+  const input = path.join(tmp, 'receipt-fr.json');
+  fs.writeFileSync(input, JSON.stringify(localeDocument('architecture', {
+    locale: 'fr',
+    translations: { ...FR_PARTIAL_TRANSLATIONS, 'viewer.common.closee': 'Fermer' },
+  })));
+  const validated = cliJson(['validate', 'architecture', input, '--json']);
+  const delivered = cliJson(['deliver', 'architecture', input, path.join(tmp, 'receipt-fr.html'), '--json']);
+  for (const receipt of [validated, delivered]) {
+    assert.equal(receipt.ok, true);
+    assert.deepEqual(receipt.diagnostics.map((entry) => [entry.code, entry.severity]), [
+      ['i18n/invalid-translation', 'warning'],
+      ['i18n/translation-coverage', 'warning'],
+    ]);
+    const coverage = receipt.diagnostics[1].evidence;
+    assert.equal(coverage.missingKeysTotal, coverage.totalKeys - coverage.translatedKeys);
+    assert.equal(coverage.missingKeys.length, 10);
+    for (const key of coverage.missingKeys) assert.equal(coverage.englishSource[key], translateMessage('en', key));
+    assert.deepEqual(receipt.diagnostics[0].evidence.unknownKeys, ['viewer.common.closee']);
+  }
+
+  const clean = path.join(tmp, 'receipt-ko.json');
+  fs.writeFileSync(clean, JSON.stringify(localeDocument('architecture', { locale: 'ko' })));
+  assert.equal(cliJson(['validate', 'architecture', clean, '--json']).diagnostics, undefined);
+  assert.equal(cliJson(['deliver', 'architecture', clean, path.join(tmp, 'receipt-ko.html'), '--json']).diagnostics, undefined);
+});
+
+test('a passing finalize keeps locale warnings in its receipt', {
+  skip: chromePath ? false : 'Set ARCHIFY_CHROME to run finalize with its browser gate.',
+}, () => {
+  const input = path.join(tmp, 'finalize-fr.json');
+  fs.writeFileSync(input, JSON.stringify(localeDocument('architecture', { locale: 'fr', translations: FR_PARTIAL_TRANSLATIONS })));
+  const summary = cliJson(['finalize', 'architecture', input, path.join(tmp, 'finalize-fr.html'), '--quality', 'showcase', '--json']);
+  assert.equal(summary.ok, true);
+  assert.equal(summary.status, 'pass');
+  assert.deepEqual(summary.diagnostics.map((entry) => entry.code), ['i18n/translation-coverage']);
+  const full = JSON.parse(fs.readFileSync(summary.evidence.receipt, 'utf8'));
+  assert.deepEqual(full.diagnostics.map((entry) => entry.code), ['i18n/translation-coverage']);
+});
+
 test('the manifest enrolls exactly the bundled catalogs, and each is complete', () => {
   assert.deepEqual(MANIFEST.catalogs.map(({ locale }) => locale), SUPPORTED_LOCALES);
   const files = fs.readdirSync(path.join(skillRoot, 'locales')).filter((file) => file.endsWith('.json') && file !== 'manifest.json').sort();
