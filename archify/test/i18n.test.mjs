@@ -603,6 +603,22 @@ test('empty translations and equivalent tag casing select the same bundled catal
     assert.equal(empty.stderr, '');
     assert.equal(empty.html, korean.html, `${type}: {} is not an override`);
   }
+  // An override under an equivalent-case tag reaches every lookup path: SVG
+  // copy, the HTML template, and the embedded Viewer catalog.
+  for (const locale of ['zh-cn', 'zh-cN']) {
+    for (const type of Object.keys(EXAMPLES)) {
+      const result = run(type, localeDocument(type, {
+        locale,
+        translations: { 'viewer.common.close': '关闭面板', 'viewer.export.diagram': '导出此图' },
+      }));
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.html, /^<!DOCTYPE html>\n<html lang="zh-CN"/);
+      const runtime = embeddedMessages(result.html);
+      assert.equal(runtime.locale, 'zh-CN');
+      assert.equal(runtime.messages['viewer.common.close'], '关闭面板', `${type}/${locale}: embedded Viewer override lost`);
+      assert.ok(result.html.includes('>导出此图<'), `${type}/${locale}: template override lost`);
+    }
+  }
   assert.equal(bundledLocaleFor('ZH-cn'), 'zh-CN');
   assert.equal(bundledLocaleFor('zh-Hant'), null);
   assert.equal(bundledLocaleFor('zh'), null);

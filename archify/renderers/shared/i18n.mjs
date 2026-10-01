@@ -195,13 +195,19 @@ export function resolveCatalog(locale, translations = undefined) {
   };
 }
 
-// Per-document catalogs installed by registerLocale(), keyed by the authored
-// tag so renderers can keep passing meta.locale. They never mutate a bundled
-// catalog.
+// Per-document catalogs installed by registerLocale(). Tags are
+// case-insensitive, so the key is lowercased: renderers may pass the authored
+// meta.locale (zh-cn) or its resolved tag (zh-CN) and reach the same document
+// catalog. They never mutate a bundled catalog.
 const DOCUMENT_CATALOGS = new Map();
 
+function documentKey(locale) {
+  return typeof locale === 'string' ? locale.toLowerCase() : locale;
+}
+
 function catalogFor(locale) {
-  if (DOCUMENT_CATALOGS.has(locale)) return DOCUMENT_CATALOGS.get(locale);
+  const key = documentKey(locale);
+  if (DOCUMENT_CATALOGS.has(key)) return DOCUMENT_CATALOGS.get(key);
   const bundledLocale = bundledLocaleFor(locale);
   return bundledLocale ? { locale: bundledLocale, messages: bundledCatalog(bundledLocale).messages } : null;
 }
@@ -212,9 +218,9 @@ function catalogFor(locale) {
 export function registerLocale(locale, translations = undefined) {
   const { messages, report } = resolveCatalog(locale, translations);
   if (report.fallback || !locale) {
-    DOCUMENT_CATALOGS.delete(locale);
+    DOCUMENT_CATALOGS.delete(documentKey(locale));
   } else {
-    DOCUMENT_CATALOGS.set(locale, { locale: report.resolvedLocale, messages });
+    DOCUMENT_CATALOGS.set(documentKey(locale), { locale: report.resolvedLocale, messages });
   }
   return report;
 }
