@@ -39,8 +39,6 @@ import {
   cleanFlowProblems,
   cleanLabelRouteClearanceProblems,
   cleanRouteRhythmProblems,
-  componentFill,
-  componentText,
   labelPoint,
   legacyDefaultFromSide,
   legacyDefaultToSide,
@@ -84,9 +82,12 @@ const layout = {
   minRelationshipLength: 24,
 };
 
-const ENTITY_FILL = componentFill.database;
-const ENTITY_ACCENT = componentText.database;
 const KEY_ACCENT = { pk: 't-database', fk: 't-messagebus', uk: 't-muted' };
+// Each key role is a tinted badge; the badge carries the role so the stylesheet
+// tints it in the role's own family and the legend hover can find it.
+const KEY_BADGE_W = 22;
+const KEY_BADGE_GAP = 3;
+const KEY_BADGE_INSET = 2;
 
 // A column can carry more than one key role: a junction table's tenant_id is
 // both part of the primary key and a foreign key to tenant.id, and stating only
@@ -100,12 +101,11 @@ function keyRoles(attribute) {
   return [...new Set(roles)];
 }
 
-// The run of glyphs one row's roles occupy, measured with the same width model
-// the rest of the renderer fits text with, so the column can be sized from it.
+// The run of badges one row's roles occupy past the column's start (the first
+// badge sits a small inset to the left of it), so the column can be sized from it.
 function keyGlyphWidth(roles) {
   if (!roles.length) return 0;
-  const units = roles.reduce((total, role) => total + textUnits(role.toUpperCase()), 0);
-  return units * layout.keyFont * nodeTextFit.widthFactor + KEY_ROLE_GAP * (roles.length - 1);
+  return roles.length * KEY_BADGE_W + (roles.length - 1) * KEY_BADGE_GAP - KEY_BADGE_INSET;
 }
 
 // One key column per table, floored at the shared width so a table that states a
@@ -119,14 +119,14 @@ function keyColumnWidth(entity) {
 
 // One glyph per role, each in its legend's own ink so a composite key reads as
 // two known markers rather than one unfamiliar token.
+function renderKeyBadge(role, x, baseline) {
+  return `<rect x="${x}" y="${baseline - 10}" width="${KEY_BADGE_W}" height="13" rx="3" class="er-key-badge" data-er-badge="${esc(role)}"/><text data-detail="context" x="${x + KEY_BADGE_W / 2}" y="${baseline}" class="${KEY_ACCENT[role] || 't-muted'}" font-size="${layout.keyFont}" font-weight="600">${esc(role.toUpperCase())}</text>`;
+}
+
 function renderKeyGlyphs(attribute, x0, baseline) {
-  let x = x0;
-  return keyRoles(attribute).map((role) => {
-    const text = role.toUpperCase();
-    const glyph = `<text data-detail="context" x="${Math.round(x * 10) / 10}" y="${baseline}" class="${KEY_ACCENT[role] || 't-muted'}" font-size="${layout.keyFont}" font-weight="600">${esc(text)}</text>`;
-    x += textUnits(text) * layout.keyFont * nodeTextFit.widthFactor + KEY_ROLE_GAP;
-    return glyph;
-  }).join('');
+  return keyRoles(attribute)
+    .map((role, index) => renderKeyBadge(role, x0 - KEY_BADGE_INSET + index * (KEY_BADGE_W + KEY_BADGE_GAP), baseline))
+    .join('');
 }
 
 // ---- Measure entities from the banded grid -----------------------------------
@@ -278,12 +278,14 @@ const MARKER_CIRCLE_X = 3.5;
 // The glyph spans y 1..15, so two ports closer than this draw overlapping
 // symbols and the side reads as one lattice instead of N cardinalities.
 const MARKER_HEIGHT = 14;
-function cardinalityMarkerMarkup(id, { cardinality, optional, mirror }) {
+// One glyph source for the relationship markers and the legend swatches, so the
+// legend can never teach a different symbol than the lines draw.
+function cardinalityGlyphParts({ cardinality, optional, mirror = false }) {
   const flip = (x) => (mirror ? MARKER_TOE_X - x : x);
   const parts = [];
   if (cardinality === 'many') {
     parts.push(`<path d="M ${flip(MARKER_APEX_X)} 8 L ${flip(MARKER_TOE_X)} 1 M ${flip(MARKER_APEX_X)} 8 L ${flip(MARKER_TOE_X)} 8 M ${flip(MARKER_APEX_X)} 8 L ${flip(MARKER_TOE_X)} 15"/>`);
-  } else {
+  } else if (cardinality === 'one') {
     parts.push(`<path d="M ${flip(17)} 1 L ${flip(17)} 15"/>`);
   }
   if (optional) {
@@ -293,9 +295,13 @@ function cardinalityMarkerMarkup(id, { cardinality, optional, mirror }) {
     parts.push(`<circle cx="${flip(MARKER_CIRCLE_X)}" cy="8" r="2.6" class="c-mask"/>`);
     parts.push(`<circle cx="${flip(MARKER_CIRCLE_X)}" cy="8" r="2.6"/>`);
   }
+  return parts;
+}
+
+function cardinalityMarkerMarkup(id, { cardinality, optional, mirror }) {
   const refX = mirror ? 0 : MARKER_TOE_X;
   return `          <marker id="${esc(id)}" markerWidth="${MARKER_GLYPH_WIDTH}" markerHeight="18" refX="${refX}" refY="8" orient="auto" markerUnits="userSpaceOnUse" class="a-default" style="stroke: var(--text-muted)" stroke-width="1.75">
-            ${parts.join('\n            ')}
+            ${cardinalityGlyphParts({ cardinality, optional, mirror }).join('\n            ')}
           </marker>`;
 }
 
@@ -320,8 +326,20 @@ function renderCardinalityDefs() {
 }
 
 // ---- Legend ------------------------------------------------------------------
+// The ERD kinds are column keys and relationship ends, not `data-node-kind`
+// values, so the Viewer's counted node lens would mark every entry as zero.
+// The entries stay static and highlight their matches in the SVG on hover.
 const LEGEND_CATALOG = ['pk', 'fk', 'uk', 'one', 'many', 'optional']
-  .map((kind) => ({ kind, label: i18nText(er.meta.locale, `legend.erd.${kind}`), swatchWidth: 18 }));
+  .map((kind) => ({ kind, label: i18nText(er.meta.locale, `legend.erd.${kind}`), interactive: false }));
+const KEY_KINDS = new Set(['pk', 'fk', 'uk']);
+
+// The kinds one relationship shows at its two ends; the legend hover matches
+// a route and its label by this list.
+function relationshipEnds(relationship) {
+  const ends = new Set([cardinalityOf(relationship, 'from'), cardinalityOf(relationship, 'to')]);
+  if (optionalOf(relationship, 'from') || optionalOf(relationship, 'to')) ends.add('optional');
+  return [...ends];
+}
 
 const presentKinds = new Set();
 for (const entity of entities.values()) {
@@ -330,16 +348,32 @@ for (const entity of entities.values()) {
   }
 }
 for (const relationship of relationships) {
-  presentKinds.add(cardinalityOf(relationship, 'from'));
-  presentKinds.add(cardinalityOf(relationship, 'to'));
-  if (optionalOf(relationship, 'from') || optionalOf(relationship, 'to')) presentKinds.add('optional');
+  for (const kind of relationshipEnds(relationship)) presentKinds.add(kind);
 }
-const erLegendEntries = resolveLegend(er.meta?.legend, LEGEND_CATALOG, presentKinds);
 
 // The reserved legend band: its baseline sits this far above the canvas bottom,
 // and its labels are set at this size. Both are part of the band's footprint.
 const LEGEND_BASELINE_GAP = 16;
 const LEGEND_FONT_SIZE = 10;
+const LEGEND_KEY_SWATCH = 22;
+const LEGEND_END_SWATCH = 30;
+// Extra space before the first relationship entry that follows a key entry, so
+// the divider between the column and relationship groups has room on both sides.
+const LEGEND_GROUP_LEAD = 10;
+
+// The shared renderer sets labels two units above the measured font size, so
+// each entry reserves that difference and the hover pill never overlaps its
+// neighbour. Computed from the resolved label, so an authored label is measured.
+const erLegendEntries = resolveLegend(er.meta?.legend, LEGEND_CATALOG, presentKinds).map((entry, index, all) => {
+  const isKey = KEY_KINDS.has(entry.kind);
+  const lead = !isKey && index > 0 && KEY_KINDS.has(all[index - 1].kind) ? LEGEND_GROUP_LEAD : 0;
+  return {
+    ...entry,
+    lead,
+    swatchWidth: (isKey ? LEGEND_KEY_SWATCH : LEGEND_END_SWATCH) + lead,
+    trailingWidth: Math.ceil(textUnits(entry.label) * 2 * 0.62),
+  };
+});
 
 // One layout object for the reserved legend band, shared by the sizing probe
 // and the render call so the drawing area is never sized against a different
@@ -796,8 +830,57 @@ function rowTextWidths(attribute) {
   return { name, type };
 }
 
+// Measure the title and note together: each owns a disjoint interval rather
+// than independently fitting against the entire header. A second line is only
+// possible when the author's existing header has enough height; never resize
+// the table or hide an explicit note to make it pass.
+function entityHeader(entity) {
+  const detail = entity.sublabel ?? (bandedEntityIds.has(entity.id) ? undefined : entity.tag);
+  const titleInset = 30;
+  const titleWidth = entity.width - titleInset - layout.padX;
+  const advance = (text, font) => textUnits(text) * font * nodeTextFit.widthFactor;
+  let detailFont = detail ? layout.detailPreferred : 0;
+  let labelFont = fittedNodeFontSize(entity.label, titleWidth + nodeTextFit.horizontalPadding, layout.headerFont, layout.headerFontMinimum);
+  const labelY = 19;
+  let detailY = labelY;
+  let detailWidth = detail ? advance(detail, detailFont) : 0;
+  if (detail) {
+    const gap = 12;
+    const minLabelWidth = advance(entity.label, layout.headerFontMinimum);
+    const noteCapacity = titleWidth - minLabelWidth - gap;
+    detailFont = fittedNodeFontSize(detail, noteCapacity + nodeTextFit.horizontalPadding, layout.detailPreferred, layout.detailMinimum);
+    detailWidth = advance(detail, detailFont);
+    labelFont = fittedNodeFontSize(entity.label, titleWidth - detailWidth - gap + nodeTextFit.horizontalPadding, layout.headerFont, layout.headerFontMinimum);
+    if (advance(entity.label, labelFont) + detailWidth + gap > titleWidth) {
+      if (metrics.headerH >= 40) {
+        labelFont = fittedNodeFontSize(entity.label, titleWidth + nodeTextFit.horizontalPadding, layout.headerFont, layout.headerFontMinimum);
+        detailFont = fittedNodeFontSize(detail, titleWidth + nodeTextFit.horizontalPadding, layout.detailPreferred, layout.detailMinimum);
+        detailWidth = advance(detail, detailFont);
+        detailY = 33;
+      } else return { problem: true, detail, titleWidth };
+    }
+  }
+  if (advance(entity.label, labelFont) > titleWidth || detailWidth > titleWidth) {
+    return { problem: true, detail, titleWidth };
+  }
+  return { detail, labelFont, detailFont, labelY, detailY, titleInset };
+}
+
 function validateEr() {
   const problems = [];
+  const headerDetails = [];
+  for (const entity of entities.values()) {
+    const header = entityHeader(entity);
+    if (!header.problem) continue;
+    const message = `Entity "${entity.id}" title and header note do not fit at readable sizes — widen the entity, shorten the text, or increase layout.headerH to at least 40 for a second line.`;
+    problems.push(message);
+    headerDetails.push({
+      code: 'erd/header-text-capacity', severity: 'error', message,
+      subject: { diagramType: 'erd', entityId: entity.id },
+      evidence: { label: entity.label, detail: header.detail, availableWidth: header.titleWidth, headerHeight: metrics.headerH },
+      supportedFixes: ['Widen the entity.', 'Shorten the title or header note.', 'Increase layout.headerH to at least 40 for a second line.'],
+    });
+  }
   validateErGridPlacement(er, grid, bands, problems);
 
   const seenEntityIds = new Set();
@@ -989,7 +1072,7 @@ function validateEr() {
     throwDiagnosticProblems('Entity-relationship layout validation failed', problems, {
       code: 'layout/constraint',
       subject: { diagramType: 'erd' },
-      diagnostics: portSpacingDetails,
+      diagnostics: [...headerDetails, ...portSpacingDetails],
     });
   }
 }
@@ -1030,10 +1113,10 @@ function renderEntityColumnRows(entity) {
       layout.rowFontMinimum,
     );
     const type = attribute.type
-      ? `<text data-detail="context" x="${entity.x + entity.width - layout.padX}" y="${baseline}" class="t-primary" font-size="${layout.typeFont}" text-anchor="end">${esc(attribute.type)}</text>`
+      ? `<text data-detail="context" x="${entity.x + entity.width - layout.padX}" y="${baseline}" class="er-type" font-size="${layout.typeFont}" text-anchor="end">${esc(attribute.type)}</text>`
       : '';
     return `          <g data-detail="context" data-er-row="${index}">
-            <line x1="${entity.x}" y1="${rowTop}" x2="${entity.x + entity.width}" y2="${rowTop}" class="c-grid" stroke-width="0.5"/>
+            <line x1="${entity.x}" y1="${rowTop}" x2="${entity.x + entity.width}" y2="${rowTop}" class="c-grid er-row-rule" stroke-width="0.5"/>
             ${keyGlyph}
             <text data-detail="context" x="${nameX}" y="${baseline}" class="t-primary" font-size="${nameFontSize}">${esc(attribute.name)}</text>
             ${type}
@@ -1043,31 +1126,24 @@ function renderEntityColumnRows(entity) {
 
 function renderEntity(entity) {
   const header = entity.y + metrics.headerH;
-  // A banded table already carries its domain on the band, so repeating the tag
-  // in the header would be noise; the header note falls back to the tag only for
-  // a table that has no band of its own.
-  const detail = entity.sublabel ?? (bandedEntityIds.has(entity.id) ? undefined : entity.tag);
-  const detailFontSize = detail
-    ? fittedNodeFontSize(detail, 60, layout.detailPreferred, layout.detailMinimum)
-    : 0;
-  const detailFits = detail ? textUnits(detail) * detailFontSize * nodeTextFit.widthFactor <= 64 : false;
-  const labelFontSize = fittedNodeFontSize(entity.label, entity.width - 34, layout.headerFont, layout.headerFontMinimum);
+  const { detail, labelFont, detailFont, labelY, detailY, titleInset } = entityHeader(entity);
   const passport = {
     kind: 'database',
     sublabel: entity.sublabel,
     tag: entity.tag,
     context: i18nText(er.meta.locale, 'node.context.erd'),
   };
-  const sublabel = detailFits
-    ? `\n          <text data-detail="context" x="${entity.x + entity.width - layout.padX}" y="${entity.y + 16}" class="t-muted" font-size="${detailFontSize}" text-anchor="end">${esc(detail)}</text>`
+  const sublabel = detail
+    ? `\n          <text data-detail="context" x="${entity.x + entity.width - layout.padX}" y="${entity.y + detailY}" class="er-type" font-size="${detailFont}" text-anchor="end">${esc(detail)}</text>`
     : '';
   const rows = renderEntityColumnRows(entity);
   return `        <g ${focusNodeAttrs(entity.id, entity.label, passport, er.meta.locale)}>
           ${focusNodeTitle(entity.label, passport)}
           <rect x="${entity.x}" y="${entity.y}" width="${entity.width}" height="${entity.height}" rx="5" class="c-mask"/>
-          <rect x="${entity.x}" y="${entity.y}" width="${entity.width}" height="${entity.height}" rx="5" class="${ENTITY_FILL}"${animateAttr(er.meta, 'node', entitySteps.get(entity.id))} stroke-width="1.5"/>
-          ${renderSemanticSigil('database', { x: entity.x + 6, y: entity.y + 5 })}
-          <text data-node-label="" x="${entity.x + entity.width / 2}" y="${entity.y + 18}" class="t-primary" font-size="${labelFontSize}" font-weight="600" text-anchor="middle">${esc(entity.label)}</text>${sublabel}
+          <rect x="${entity.x}" y="${entity.y}" width="${entity.width}" height="${entity.height}" rx="5" class="c-database er-table"${animateAttr(er.meta, 'node', entitySteps.get(entity.id))} stroke-width="1.5"/>
+          <path class="er-table-header" d="M ${entity.x + 5} ${entity.y} H ${entity.x + entity.width - 5} Q ${entity.x + entity.width} ${entity.y} ${entity.x + entity.width} ${entity.y + 5} V ${header} H ${entity.x} V ${entity.y + 5} Q ${entity.x} ${entity.y} ${entity.x + 5} ${entity.y} Z"/>
+          ${renderSemanticSigil('database', { x: entity.x + 8, y: entity.y + 7, size: 14 })}
+          <text data-node-label="" x="${entity.x + titleInset}" y="${entity.y + labelY}" class="t-primary" font-size="${labelFont}" font-weight="700">${esc(entity.label)}</text>${sublabel}
           <line x1="${entity.x}" y1="${header}" x2="${entity.x + entity.width}" y2="${header}" class="c-grid" stroke-width="1"/>
 ${rows}
         </g>`;
@@ -1078,38 +1154,51 @@ function renderRelationshipPath(relationship, index) {
   const routed = pathFor(relationship);
   const d = bundledRelationshipD(routed, relationshipTrunkRuns(relationship));
   const strokeWidth = Number.isFinite(relationship.width) ? relationship.width : 1.5;
-  return `        <path ${focusEdgeAttrs(relationship.from, relationship.to, relationship.label, index, relationship.id)} data-composition-points="${routePointsValue(routed.points)}" d="${d}" class="${cls}"${animateAttr(er.meta, 'edge', index)} stroke-width="${strokeWidth}" marker-start="url(#${cardinalityMarkerId(relationship, 'from')})" marker-end="url(#${cardinalityMarkerId(relationship, 'to')})"/>`;
+  return `        <path ${focusEdgeAttrs(relationship.from, relationship.to, relationship.label, index, relationship.id)} data-er-ends="${relationshipEnds(relationship).join(' ')}" data-composition-points="${routePointsValue(routed.points)}" d="${d}" class="${cls}"${animateAttr(er.meta, 'edge', index)} stroke-width="${strokeWidth}" marker-start="url(#${cardinalityMarkerId(relationship, 'from')})" marker-end="url(#${cardinalityMarkerId(relationship, 'to')})"/>`;
 }
 
 function renderRelationshipLabel(relationship, index) {
   if (!relationship.label) return '';
   const [lx, ly] = erLabelPoint(relationship);
   const box = relationshipLabelBox(relationship);
-  return `        <g data-detail="context" ${focusEdgeAttrs(relationship.from, relationship.to, relationship.label, index, relationship.id)}>
+  return `        <g data-detail="context" ${focusEdgeAttrs(relationship.from, relationship.to, relationship.label, index, relationship.id)} data-er-ends="${relationshipEnds(relationship).join(' ')}">
           <rect x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" rx="3" class="c-mask"/>
           <text x="${lx}" y="${ly}" class="${variantAccent(relationship.variant)}" font-size="${RELATIONSHIP_LABEL_FONT}" text-anchor="middle">${esc(relationship.label)}</text>
         </g>`;
 }
 
-// The swatch repeats the marker's own ink and weight, so the legend shows the
-// reader the exact glyph the diagram draws rather than a thinner stand-in.
+// A key swatch is the badge a field row draws. A relationship swatch is a short
+// route meeting a table edge, carrying the marker's own glyph, ink, and weight,
+// so the legend shows the symbol in the context the diagram draws it.
 function legendSwatch(entry) {
-  const y = entry.baseline - 10;
-  const ink = 'style="stroke: var(--text-muted)" stroke-width="1.75" fill="none"';
-  if (entry.kind === 'one' || entry.kind === 'many') {
-    // The swatch repeats the marker's own orientation: the foot opens toward
-    // the side a table would sit on, so the legend teaches the glyph the
-    // relationship lines draw.
-    const symbol = entry.kind === 'many'
-      ? `<path d="M ${entry.x + 2} ${y + 6} L ${entry.x + 18} ${y + 1} M ${entry.x + 2} ${y + 6} L ${entry.x + 18} ${y + 6} M ${entry.x + 2} ${y + 6} L ${entry.x + 18} ${y + 11}" ${ink}/>`
-      : `<path d="M ${entry.x + 10} ${y + 1} L ${entry.x + 10} ${y + 11}" ${ink}/>`;
-    return symbol;
+  const x = entry.x + entry.lead;
+  const centerY = entry.baseline - 4;
+  const hit = `<rect class="er-legend-hit" tabindex="0" role="img" aria-label="${esc(entry.label)}" x="${x - 6}" y="${entry.baseline - 15}" width="${entry.width - entry.lead + 12}" height="22" rx="11"/>`;
+  const divider = entry.lead && entry.x > layout.margin
+    ? `<line x1="${entry.x - 4}" y1="${centerY - 8}" x2="${entry.x - 4}" y2="${centerY + 8}" class="er-legend-divider" stroke-width="1"/>`
+    : '';
+  if (KEY_KINDS.has(entry.kind)) {
+    return `${hit}<rect x="${x}" y="${entry.baseline - 10}" width="${LEGEND_KEY_SWATCH}" height="13" rx="3" class="er-key-badge" data-er-badge="${entry.kind}"/><text x="${x + LEGEND_KEY_SWATCH / 2}" y="${entry.baseline}" class="${KEY_ACCENT[entry.kind]}" text-anchor="middle" font-size="${layout.keyFont}" font-weight="600">${esc(entry.kind.toUpperCase())}</text>`;
   }
-  if (entry.kind === 'optional') {
-    return `<circle cx="${entry.x + 9}" cy="${y + 6}" r="3" ${ink}/>`;
-  }
-  return `<text x="${entry.x + 2}" y="${y + 10}" class="${KEY_ACCENT[entry.kind] || 't-muted'}" font-size="${layout.keyFont}" font-weight="700">${esc(entry.kind.toUpperCase())}</text>`;
+  const edgeX = x + LEGEND_END_SWATCH - 2;
+  const glyph = cardinalityGlyphParts({
+    cardinality: entry.kind === 'optional' ? null : entry.kind,
+    optional: entry.kind === 'optional',
+  });
+  return `${divider}${hit}<line x1="${x}" y1="${centerY}" x2="${edgeX}" y2="${centerY}" class="er-legend-route" stroke-width="1.5"/><line x1="${edgeX}" y1="${centerY - 7}" x2="${edgeX}" y2="${centerY + 7}" class="er-legend-edge" stroke-width="2"/><g class="er-legend-glyph" transform="translate(${edgeX - MARKER_TOE_X} ${centerY - 8})" style="stroke: var(--text-muted)" stroke-width="1.75" fill="none">${glyph.join('')}</g>`;
 }
+
+// The ring a highlighted badge takes, in the ink of the role's own text.
+const KEY_RING = { pk: 'var(--database-stroke)', fk: 'var(--messagebus-stroke)', uk: 'var(--text-muted)' };
+
+const LEGEND_HOVER_RULES = [
+  ...Object.entries(KEY_RING).map(([kind, ring]) => `          svg[data-erd-ui="cards"]:has([data-legend-semantic-kind="${kind}"]:is(:hover, :focus-within)) [data-er-row]:not(:has([data-er-badge="${kind}"])) { opacity: .22; }
+          svg[data-erd-ui="cards"]:has([data-legend-semantic-kind="${kind}"]:is(:hover, :focus-within)) [data-er-row] [data-er-badge="${kind}"] { stroke: ${ring}; stroke-width: 1.25; }`),
+  // Most schemas carry one and many on every route, so dimming alone would show
+  // nothing: the matching glyph itself takes the accent ink wherever it is drawn.
+  ...Object.entries({ one: '[id^="er-one"]', many: '[id^="er-many"]', optional: '[id*="-optional"]' }).map(([kind, marker]) => `          svg[data-erd-ui="cards"]:has([data-legend-semantic-kind="${kind}"]:is(:hover, :focus-within)) [data-er-ends]:not([data-er-ends~="${kind}"]) { opacity: .12; }
+          svg[data-erd-ui="cards"]:has([data-legend-semantic-kind="${kind}"]:is(:hover, :focus-within)) marker${marker} { stroke: var(--database-stroke) !important; stroke-width: 2.25; }`),
+].join('\n');
 
 function renderLegend() {
   const relationshipObstacles = relationshipLegendObstacles(relationships, {
@@ -1138,9 +1227,32 @@ function renderSvg() {
   // authoritative and keeps the established Viewer contract.
   const readerFit = er.meta?.viewBox ? '' : ' data-reader-fit="intrinsic-height"';
   const readerMinimumText = er.meta?.viewBox ? '' : ' data-reader-min-text="7.5"';
-  return `      <svg viewBox="0 0 ${viewBox[0]} ${viewBox[1]}" ${svgRootAttrs(er.meta)}${readerFit}${readerMinimumText}>
+  return `      <svg viewBox="0 0 ${viewBox[0]} ${viewBox[1]}" ${svgRootAttrs(er.meta)} data-erd-ui="cards"${readerFit}${readerMinimumText}>
 ${svgAccessibleText(er.meta, 'erd')}
 ${renderDefinitions(renderCardinalityDefs())}
+        <style>
+          svg[data-erd-ui="cards"] .er-table { fill: var(--mask); stroke: var(--lane-stroke); }
+          svg[data-erd-ui="cards"] .er-table-header { fill: var(--database-fill); stroke: none; }
+          svg[data-erd-ui="cards"] .er-row-rule { stroke: var(--lane-stroke); stroke-opacity: .55; }
+          svg[data-erd-ui="cards"] .er-type { fill: var(--text-muted); }
+          svg[data-erd-ui="cards"] .er-key-badge { fill: var(--database-fill); stroke: none; }
+          svg[data-erd-ui="cards"] .er-key-badge[data-er-badge="fk"] { fill: var(--messagebus-fill); }
+          svg[data-erd-ui="cards"] .er-key-badge[data-er-badge="uk"] { fill: none; stroke: var(--lane-stroke); }
+          svg[data-erd-ui="cards"] .er-key-badge + text { text-anchor: middle; }
+          svg[data-erd-ui="cards"] [data-legend] text.t-primary { fill: var(--text); }
+          svg[data-erd-ui="cards"] [data-legend] > text.t-primary { fill: var(--text-muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+          svg[data-erd-ui="cards"] .er-legend-hit { fill: transparent; transition: fill .15s; }
+          svg[data-erd-ui="cards"] .er-legend-hit:focus { outline: none; }
+          svg[data-erd-ui="cards"] .er-legend-hit:focus-visible { stroke: var(--database-stroke); stroke-width: 1.5; }
+          svg[data-erd-ui="cards"] [data-legend-semantic-kind]:is(:hover, :focus-within) .er-legend-hit { fill: var(--database-fill); }
+          svg[data-erd-ui="cards"] [data-legend-semantic-kind]:is(:hover, :focus-within) .er-legend-glyph { stroke: var(--database-stroke) !important; }
+          svg[data-erd-ui="cards"] .er-legend-route { stroke: var(--text-muted); stroke-opacity: .55; }
+          svg[data-erd-ui="cards"] .er-legend-edge { stroke: var(--lane-stroke); stroke-linecap: round; }
+          svg[data-erd-ui="cards"] .er-legend-divider { stroke: var(--lane-stroke); }
+          svg[data-erd-ui="cards"] [data-er-row], svg[data-erd-ui="cards"] [data-er-ends] { transition: opacity .15s; }
+${LEGEND_HOVER_RULES}
+          @media (prefers-reduced-motion: reduce) { svg[data-erd-ui="cards"] * { transition: none !important; } }
+        </style>
 
         <!-- Background Grid -->
         <rect width="100%" height="100%" fill="url(#grid)" />

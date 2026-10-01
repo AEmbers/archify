@@ -53,7 +53,7 @@ function attrs(tag) {
 function entityBoxes(html) {
   const svg = html.match(/<svg\b[\s\S]*?<\/svg>/gi)[0];
   const boxes = new Map();
-  for (const match of svg.matchAll(/data-node-id="([a-z_]+)"[\s\S]{0,500}?<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="5" class="c-database"/g)) {
+  for (const match of svg.matchAll(/data-node-id="([a-z_]+)"[\s\S]{0,500}?<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" rx="5" class="c-database(?: er-table)?"/g)) {
     boxes.set(match[1], { x: +match[2], y: +match[3], width: +match[4], height: +match[5] });
   }
   return boxes;
@@ -520,8 +520,9 @@ test('a column that is both a primary and a foreign key draws both markers', () 
 
   const membership = entityBoxes(html).get('membership');
   const membershipNameX = attributeNameX(html, 'membership', 'tenant_id') - membership.x - 12;
-  assert.ok(membershipNameX >= 30 && membershipNameX < 36,
-    `a two-role column stays near the shared width so field names stay aligned (got ${membershipNameX})`);
+  // Two badges and the gap between them, plus the porch before the name.
+  assert.ok(membershipNameX >= 30 && membershipNameX <= 50,
+    `a two-role column grows only by the second badge so field names stay aligned (got ${membershipNameX})`);
 
   // A three-role run is wider than the shared column. The column grows with it
   // rather than letting the markers run into the field name.
@@ -771,9 +772,9 @@ test('an automatic canvas is sized so the default legend is always in the conten
   const viewBoxHeight = Number(root.match(/viewBox="0 0 [\d.]+ ([\d.]+)"/)[1]);
   assert.ok(Number.isFinite(viewBoxHeight) && viewBoxHeight > 0, 'the canvas has a measured height');
 
-  const kinds = [...html.matchAll(/data-legend-semantic-kind="([a-z]+)"/g)].map((match) => match[1]);
+  const kinds = [...html.matchAll(/<g data-legend-semantic-kind="([a-z]+)"/g)].map((match) => match[1]);
   assert.deepEqual(kinds.sort(), ['fk', 'many', 'one', 'optional', 'pk', 'uk'], 'every declared kind keeps its entry');
-  const boxes = [...html.matchAll(/<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="([\d.]+)" rx="5" class="c-database"/g)];
+  const boxes = [...html.matchAll(/<rect x="[\d.]+" y="([\d.]+)" width="[\d.]+" height="([\d.]+)" rx="5" class="c-database(?: er-table)?"/g)];
   assert.ok(boxes.length >= 2, 'both tables are drawn');
   const contentBottom = Math.max(...boxes.map((match) => Number(match[1]) + Number(match[2])));
   const baselines = [...html.matchAll(/data-legend-baseline="([\d.]+)"/g)].map((match) => Number(match[1]));
@@ -792,6 +793,15 @@ test('an automatic canvas is sized so the default legend is always in the conten
     assert.equal(labelClass, 't-primary', 'the legend label uses the primary ink, not the shared muted one');
     assert.equal(weight, '600', 'the legend label keeps the ERD weight');
   }
+
+  // ERD kinds are not node kinds, so the Viewer's counted lens would badge
+  // every entry with a false zero; the legend stays out of that bridge and
+  // highlights its matches through the row and route attributes instead.
+  assert.doesNotMatch(html, /data-legend-kind=|data-legend-bridge=/, 'the ERD legend does not join the node-kind lens');
+  assert.equal([...html.matchAll(/class="er-legend-hit"/g)].length, 6, 'every entry has a hover target');
+  assert.equal([...html.matchAll(/class="er-legend-glyph"/g)].length, 3, 'each relationship entry draws the marker glyph');
+  assert.match(html, /<g data-detail="context" data-er-row="0">\s*<line[^>]*\/>\s*<rect [^>]*class="er-key-badge" data-er-badge="pk"\/>/, 'a key badge names its role for the legend hover');
+  assert.match(html, /data-er-ends="many one optional"/, 'a route names the ends it draws for the legend hover');
 });
 
 // An authored meta.viewBox is a fixed drawing area. There the same measurement
@@ -940,4 +950,46 @@ test('a bundled trunk is painted under the markers it passes', () => {
     /<circle[^>]*class="c-mask"\/>\s*<circle[^>]*\/>/,
     'the optionality ring masks the relationship line it sits on',
   );
+});
+
+
+test('table title and explicit note occupy separate header intervals or fail with capacity evidence', () => {
+  const diagram = cloneWithoutViews(example);
+  diagram.entities = [{
+    id: 'subscription', label: 'customer_subscription', sublabel: 'billing',
+    pos: [40, 80], width: 240,
+    attributes: [{ name: 'id', type: 'bigint', key: 'pk' }],
+  }];
+  diagram.relationships = [];
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-header-'));
+  const success = render(diagram, directory);
+  assert.equal(success.status, 0, success.stderr);
+  const html = fs.readFileSync(success.output, 'utf8');
+  const title = attrs(html.match(/<text data-node-label=""[^>]*>customer_subscription<\/text>/)[0]);
+  const note = attrs(html.match(/<text[^>]*>billing<\/text>/)[0]);
+  // Same-line bounds use the renderer's conservative text advance, including
+  // the explicit 12-unit separation between independently authored strings.
+  const titleRight = +title.x + 'customer_subscription'.length * +title['font-size'] * 0.6;
+  const noteLeft = +note.x - 'billing'.length * +note['font-size'] * 0.6;
+  assert.equal(title.y, note.y);
+  assert.ok(noteLeft - titleRight >= 11.9, `header text must stay apart: ${titleRight}, ${noteLeft}`);
+  assert.deepEqual(entityBoxes(html).get('subscription'), { x: 40, y: 80, width: 240, height: 56 });
+
+  diagram.entities[0].sublabel = 'An explicitly authored billing ownership note that cannot fit';
+  const failureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-header-capacity-'));
+  const failure = render(diagram, failureDirectory);
+  assert.notEqual(failure.status, 0, 'an oversized explicit note must never be silently dropped');
+  assert.match(failure.stderr + failure.stdout, /erd\/header-text-capacity/);
+  assert.equal(fs.existsSync(failure.output), false);
+
+  diagram.layout = { mode: 'grid', headerH: 40 };
+  diagram.entities[0].sublabel = 'billing ownership';
+  diagram.entities[0].width = 200;
+  const twoLineDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-header-two-lines-'));
+  const twoLine = render(diagram, twoLineDirectory);
+  assert.equal(twoLine.status, 0, twoLine.stderr);
+  const twoLineHtml = fs.readFileSync(twoLine.output, 'utf8');
+  const separateTitle = attrs(twoLineHtml.match(/<text data-node-label=""[^>]*>customer_subscription<\/text>/)[0]);
+  const separateNote = attrs(twoLineHtml.match(/<text[^>]*>billing ownership<\/text>/)[0]);
+  assert.ok(+separateNote.y > +separateTitle.y, 'an authored taller header can use the spare line');
 });

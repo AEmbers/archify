@@ -58,7 +58,8 @@ function measuredEntryWidth(entry, fontSize, swatchGap) {
     swatchWidth
     + swatchGap
     + textUnits(entry.label) * fontSize * TEXT_ADVANCE_EM
-    + (entry.interactive ? INTERACTIVE_BADGE_ALLOWANCE : 0),
+    + (entry.interactive ? INTERACTIVE_BADGE_ALLOWANCE : 0)
+    + (entry.trailingWidth ?? 0),
   );
 }
 

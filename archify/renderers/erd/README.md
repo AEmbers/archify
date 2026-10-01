@@ -38,9 +38,10 @@ An entity carries the table name in `label`, its attributes in `attributes`, and
 count, so the layout never needs hand-measured sizes. An attribute's `key` accepts
 `pk`, `fk`, or `uk`, or a list of them: a junction table's column is often part of
 the primary key and a foreign key to the same parent, and stating one role would
-hide the other. Each role draws its own marker in its legend's ink, a role named
-twice draws once, and the key column is measured from the widest run in the table —
-never narrower than the shared width, wider when the markers need it. Every `fk`
+hide the other. Each role draws its own badge, tinted in its legend's family, a
+role named twice draws once, and the key column is measured from the widest badge
+run in the table — never narrower than the shared width, wider when the badges
+need it. Every `fk`
 role — alone or inside a list — must also name its target as `"entity.attribute"`
 in `references`, and that target is checked against the declared entities and
 attributes.
@@ -123,17 +124,14 @@ claim a grouping the placement contradicts; that tag stays in the table header
 instead, together with any `sublabel`. A single-table domain always reads that
 way. `sublabel` is the per-table note and is never drawn on a band.
 
-The header note is the one text this renderer will leave out. It is written
-right-aligned in the table's header band, so it draws only when it fits the fixed
-64-unit budget that band reserves beside the table name — a budget that does not
-grow with the box, so a wider table does not buy a longer note. A longer note is
-dropped rather than run over the name or past the header edge; the string itself
-stays on the node (`data-node-sublabel`, `data-node-tag`, and the SVG `<title>`),
-and a dropped `sublabel` also stays in the table's accessible name, while a
-dropped `tag` does not, because the accessible name is the label plus the
-`aria-label` detail. The lever is a shorter note. The domain `tag` never depends
-on it — a banded table shows its domain on the band, and an unbanded table shows
-the tag in the header only while it fits.
+The title and header note share the measured width of the header. The note
+stays right-aligned with a clear gap from the left-aligned title. If both cannot
+fit at readable sizes, the renderer returns `erd/header-text-capacity` rather
+than hiding authored information. Widen the table, shorten its title or note,
+or explicitly set `layout.headerH` to at least 40 to allow a second line.
+Existing header and entity dimensions are preserved unless the author changes
+them. Banded tables still show the domain on the band rather than repeating it
+in the header.
 
 ## Cardinality ink
 
@@ -155,6 +153,16 @@ failure and raises the diagnostic instead of dropping the key, and an authored
 `meta.viewBox` — a fixed drawing area — names the capacity it lacks
 (`legend/vertical-overflow`, `legend/label-too-wide`, or `legend/content-overlap`,
 each with the fix that resolves it).
+
+The legend has two groups split by a divider. Key entries draw the same badge a
+field row draws; relationship entries draw a short route meeting a table edge
+with the marker's own glyph. ERD kinds are column keys and relationship ends,
+not node kinds, so the entries stay out of the Viewer's counted node lens, which
+would badge each one with a false zero. Hovering or keyboard-focusing an entry
+highlights its matches in the SVG itself: a key fades the other field rows and
+outlines the matching badges; a relationship end recolours that glyph wherever
+it is drawn and fades routes that do not carry it. Static exports keep the plain
+legend.
 
 A canvas taller than one screen is a normal schema, not a defect. An automatic
 canvas declares `data-reader-fit="intrinsic-height"` and
