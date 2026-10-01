@@ -36,8 +36,13 @@ ERD JSON files must set:
 An entity carries the table name in `label`, its attributes in `attributes`, and a
 `row`/`col` cell in the banded grid. The box height follows the declared attribute
 count, so the layout never needs hand-measured sizes. An attribute's `key` accepts
-`pk`, `fk`, or `uk`; an `fk` must also name its target as `"entity.attribute"` in
-`references`, and that target is checked against the declared entities and
+`pk`, `fk`, or `uk`, or a list of them: a junction table's column is often part of
+the primary key and a foreign key to the same parent, and stating one role would
+hide the other. Each role draws its own marker in its legend's ink, a role named
+twice draws once, and the key column is measured from the widest run in the table —
+never narrower than the shared width, wider when the markers need it. Every `fk`
+role — alone or inside a list — must also name its target as `"entity.attribute"`
+in `references`, and that target is checked against the declared entities and
 attributes.
 
 A relationship reads `from` -> `to` and is drawn with crow's foot notation at
@@ -48,7 +53,10 @@ declare their own maximum: `fromCardinality`/`toCardinality` take `one` or
 `many` and are required, because a maximum the author never stated is a fact the
 diagram would be inventing; `fromOptional`/`toOptional` add the optional circle
 past the apex and lower that end's minimum from one to zero.
-`identifying: false` draws the non-identifying dashed line.
+`identifying: false` draws the non-identifying dashed line, and it owns the dash:
+a `variant` that would draw the relationship solid alongside it is rejected by
+the schema, because the solid line would state the opposite of the fact. The
+variant still selects the accent for every identifying relationship.
 
 ## Layout and routing
 

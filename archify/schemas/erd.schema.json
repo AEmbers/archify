@@ -198,10 +198,25 @@
                   "type": "string"
                 },
                 "key": {
-                  "enum": [
-                    "pk",
-                    "fk",
-                    "uk"
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "pk",
+                        "fk",
+                        "uk"
+                      ]
+                    },
+                    {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "enum": [
+                          "pk",
+                          "fk",
+                          "uk"
+                        ]
+                      }
+                    }
                   ]
                 },
                 "references": {
@@ -213,7 +228,17 @@
               "if": {
                 "properties": {
                   "key": {
-                    "const": "fk"
+                    "anyOf": [
+                      {
+                        "const": "fk"
+                      },
+                      {
+                        "type": "array",
+                        "contains": {
+                          "const": "fk"
+                        }
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -320,7 +345,30 @@
           "width": {
             "$ref": "common.schema.json#/$defs/relationshipWidth"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "identifying"
+              ],
+              "properties": {
+                "identifying": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "variant": {
+                  "enum": [
+                    "dashed"
+                  ]
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "cards": {

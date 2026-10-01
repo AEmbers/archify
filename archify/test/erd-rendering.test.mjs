@@ -349,6 +349,33 @@ test('schema and reference mistakes fail with an addressed diagnostic', () => {
   result = render(defaultWidthOverflow, fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-bad-')));
   assert.notEqual(result.status, 0);
   assert.match(`${result.stdout}${result.stderr}`, /attribute 0 "extremely_long_attribute_name_here" needs \d+px of text but only \d+px/);
+
+  // The key column is part of the budget: a wider role run leaves less room for
+  // the field name, so the same table that fits under a single marker has to
+  // report the overflow rather than shrink the name onto the markers.
+  const compositeOverflow = {
+    schema_version: 1,
+    diagram_type: 'erd',
+    meta: { title: 'Composite key budget', locale: 'en' },
+    entities: [
+      {
+        id: 'a',
+        label: 'a',
+        pos: [40, 80],
+        width: 240,
+        attributes: [{ name: 'external_reference_code', type: 'int', key: ['pk', 'fk', 'uk'], references: 'b.id' }],
+      },
+      { id: 'b', label: 'b', pos: [400, 80], width: 240, attributes: [{ name: 'id', type: 'bigint', key: 'pk' }] },
+    ],
+    relationships: [],
+  };
+  result = render(compositeOverflow, fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-bad-')));
+  assert.notEqual(result.status, 0, 'the widened key column is charged to the field name');
+  assert.match(`${result.stdout}${result.stderr}`, /attribute 0 "external_reference_code" needs \d+px of text but only \d+px/);
+  compositeOverflow.entities[0].attributes[0].key = 'pk';
+  delete compositeOverflow.entities[0].attributes[0].references;
+  result = render(compositeOverflow, fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-ok-')));
+  assert.equal(result.status, 0, `the same table fits under a single marker: ${result.stdout}${result.stderr}`);
 });
 
 test('declared cardinality is drawn at both ends', () => {
@@ -411,6 +438,112 @@ test('optionality adds the zero marker and identifying false draws the dashed va
   assert.match(html, /id="er-many-optional-start"/, 'payment is zero-or-many, so its marker carries the circle');
   const [payment] = relationshipRoutes(html).filter((route) => route.from === 'payment');
   assert.match(payment.raw, /class="a-dashed"/, 'a non-identifying relationship is drawn dashed');
+});
+
+// A junction table's column is often both roles at once: the pair is the
+// primary key and each member is a foreign key. A contract holding a single
+// role forces the author to hide one of the two facts, so `key` states them all.
+function junctionDiagram() {
+  return {
+    schema_version: 1,
+    diagram_type: 'erd',
+    meta: { title: 'Junction', locale: 'en' },
+    layout: { mode: 'grid', entityW: 240, gapX: 64, gapY: 26 },
+    entities: [
+      { id: 'tenant', label: 'tenant', row: 0, col: 0, attributes: [{ name: 'id', type: 'bigint', key: 'pk' }] },
+      { id: 'user_account', label: 'user_account', row: 0, col: 1, attributes: [{ name: 'id', type: 'bigint', key: 'pk' }] },
+      {
+        id: 'membership',
+        label: 'membership',
+        row: 1,
+        col: 0,
+        attributes: [
+          { name: 'tenant_id', type: 'bigint', key: ['pk', 'fk'], references: 'tenant.id' },
+          { name: 'user_id', type: 'bigint', key: ['fk', 'pk'], references: 'user_account.id' },
+          { name: 'role', type: 'text' },
+        ],
+      },
+      {
+        id: 'tenant_settings',
+        label: 'tenant_settings',
+        row: 1,
+        col: 1,
+        attributes: [
+          { name: 'tenant_id', type: 'bigint', key: ['pk', 'fk', 'uk'], references: 'tenant.id' },
+          { name: 'payload', type: 'jsonb' },
+        ],
+      },
+    ],
+    relationships: [
+      { id: 'membership_tenant', from: 'membership', to: 'tenant', fromCardinality: 'many', toCardinality: 'one' },
+      { id: 'membership_user', from: 'membership', to: 'user_account', fromCardinality: 'many', toCardinality: 'one' },
+      { id: 'settings_tenant', from: 'tenant_settings', to: 'tenant', fromCardinality: 'one', toCardinality: 'one' },
+    ],
+  };
+}
+
+function keyGlyphRows(html) {
+  // Read the glyphs out of the row groups rather than the whole document: the
+  // legend draws the same PK/FK tokens for its key entries.
+  return [...html.matchAll(/<g data-detail="context" data-er-row="\d+">([\s\S]*?)<\/g>/g)]
+    .map((row) => [...row[1].matchAll(/<text data-detail="context" x="([\d.]+)" y="[\d.]+" class="([a-z-]+)" font-size="9" font-weight="600">(PK|FK|UK)<\/text>/g)]
+      .map((glyph) => ({ x: +glyph[1], cls: glyph[2], text: glyph[3] })));
+}
+
+function attributeNameX(html, entityId, name) {
+  // Scope the lookup to one entity's group: two tables can carry the same
+  // column name, and the first `tenant_id` in the document belongs to whichever
+  // table is drawn first.
+  const rest = html.slice(html.indexOf(`data-node-id="${entityId}"`) + 1);
+  const next = rest.indexOf('data-node-id="');
+  const group = next === -1 ? rest : rest.slice(0, next);
+  return +group.match(new RegExp(`<text data-detail="context" x="([\\d.]+)" y="[\\d.]+" class="t-primary" font-size="[\\d.]+">${name}</text>`))[1];
+}
+
+test('a column that is both a primary and a foreign key draws both markers', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-composite-key-'));
+  const { status, stdout, stderr, output } = render(junctionDiagram(), directory);
+  assert.equal(status, 0, stdout + stderr);
+  const html = fs.readFileSync(output, 'utf8');
+
+  const rows = keyGlyphRows(html);
+  assert.equal(rows.length, 7, 'every attribute keeps its own row');
+  const composite = rows.filter((row) => row.length === 2);
+  assert.equal(composite.length, 2, 'both junction columns carry two markers');
+  assert.deepEqual(composite.map((row) => row.map((glyph) => glyph.text).join(' ')), ['PK FK', 'FK PK'],
+    'the markers follow the order the author declared');
+  assert.deepEqual(composite[0].map((glyph) => glyph.cls), ['t-database', 't-messagebus'],
+    'each role keeps its own legend ink');
+  assert.ok(composite[0][1].x > composite[0][0].x + 10, 'the second marker is placed after the first, not over it');
+  assert.equal(rows.filter((row) => row.length === 1).length, 2, 'the single-role columns draw one marker');
+  assert.equal(rows.filter((row) => row.length === 0).length, 2, 'a column without a role draws none');
+
+  const membership = entityBoxes(html).get('membership');
+  const membershipNameX = attributeNameX(html, 'membership', 'tenant_id') - membership.x - 12;
+  assert.ok(membershipNameX >= 30 && membershipNameX < 36,
+    `a two-role column stays near the shared width so field names stay aligned (got ${membershipNameX})`);
+
+  // A three-role run is wider than the shared column. The column grows with it
+  // rather than letting the markers run into the field name.
+  const settings = entityBoxes(html).get('tenant_settings');
+  const settingsNameX = attributeNameX(html, 'tenant_settings', 'tenant_id');
+  assert.ok(settingsNameX > settings.x + 12 + 30 + 10,
+    `the key column widens for three roles (name starts at ${settingsNameX}, floor would be ${settings.x + 42})`);
+
+  const receipt = artifactReceipt(output);
+  assert.equal(receipt.status, 0, JSON.stringify(receipt.receipt).slice(0, 400));
+  assert.match(html, /Primary key/, 'a composite pk still earns the pk legend entry');
+  assert.match(html, /Foreign key/, 'and the fk entry');
+  assert.match(html, /Unique key/, 'and the uk entry for the three-role column');
+});
+
+test('a foreign key role inside a list is still checked against the declared schema', () => {
+  const diagram = junctionDiagram();
+  diagram.entities[2].attributes[0].references = 'tenant.missing';
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-composite-target-'));
+  const { status, stdout, stderr } = render(diagram, directory);
+  assert.notEqual(status, 0);
+  assert.match(`${stdout}${stderr}`, /has no attribute "missing"/);
 });
 
 test('the layout report exposes entity boxes and relationship points', () => {

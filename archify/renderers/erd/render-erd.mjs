@@ -88,6 +88,47 @@ const ENTITY_FILL = componentFill.database;
 const ENTITY_ACCENT = componentText.database;
 const KEY_ACCENT = { pk: 't-database', fk: 't-messagebus', uk: 't-muted' };
 
+// A column can carry more than one key role: a junction table's tenant_id is
+// both part of the primary key and a foreign key to tenant.id, and stating only
+// one of the two roles would claim less than the schema does. `key` is a role or
+// a list of roles, and a role named twice still draws once.
+const KEY_ROLE_GAP = 5;
+
+function keyRoles(attribute) {
+  const key = attribute?.key;
+  const roles = typeof key === 'string' ? [key] : asArray(key);
+  return [...new Set(roles)];
+}
+
+// The run of glyphs one row's roles occupy, measured with the same width model
+// the rest of the renderer fits text with, so the column can be sized from it.
+function keyGlyphWidth(roles) {
+  if (!roles.length) return 0;
+  const units = roles.reduce((total, role) => total + textUnits(role.toUpperCase()), 0);
+  return units * layout.keyFont * nodeTextFit.widthFactor + KEY_ROLE_GAP * (roles.length - 1);
+}
+
+// One key column per table, floored at the shared width so a table that states a
+// single role keeps the alignment every earlier diagram already has.
+function keyColumnWidth(entity) {
+  const widest = asArray(entity?.attributes)
+    .reduce((max, attribute) => Math.max(max, keyGlyphWidth(keyRoles(attribute))), 0);
+  // The trailing gap is the porch between the last marker and the field name.
+  return Math.max(layout.keyWidth, widest ? widest + KEY_ROLE_GAP : 0);
+}
+
+// One glyph per role, each in its legend's own ink so a composite key reads as
+// two known markers rather than one unfamiliar token.
+function renderKeyGlyphs(attribute, x0, baseline) {
+  let x = x0;
+  return keyRoles(attribute).map((role) => {
+    const text = role.toUpperCase();
+    const glyph = `<text data-detail="context" x="${Math.round(x * 10) / 10}" y="${baseline}" class="${KEY_ACCENT[role] || 't-muted'}" font-size="${layout.keyFont}" font-weight="600">${esc(text)}</text>`;
+    x += textUnits(text) * layout.keyFont * nodeTextFit.widthFactor + KEY_ROLE_GAP;
+    return glyph;
+  }).join('');
+}
+
 // ---- Measure entities from the banded grid -----------------------------------
 // Header and row metrics live in the grid contract so the banded layout and the
 // renderer can never disagree about a box's height.
@@ -200,8 +241,14 @@ function optionalOf(relationship, endpoint) {
   return (endpoint === 'from' ? relationship.fromOptional : relationship.toOptional) === true;
 }
 
+// `identifying: false` is a fact about the key and the dashed line is how this
+// renderer draws that fact, so the flag owns the dash. The schema rejects a
+// `variant` that would contradict it; this precedence keeps a document that
+// reached the renderer without passing the schema from drawing the
+// relationship solid.
 function markerStyleOf(relationship) {
-  return (relationship.variant ?? (relationship.identifying === false ? 'dashed' : 'default'));
+  if (relationship.identifying === false) return 'dashed';
+  return relationship.variant ?? 'default';
 }
 
 function cardinalityMarkerId(relationship, endpoint) {
@@ -279,7 +326,7 @@ const LEGEND_CATALOG = ['pk', 'fk', 'uk', 'one', 'many', 'optional']
 const presentKinds = new Set();
 for (const entity of entities.values()) {
   for (const attribute of entity.attributes) {
-    if (attribute.key) presentKinds.add(attribute.key);
+    for (const role of keyRoles(attribute)) presentKinds.add(role);
   }
 }
 for (const relationship of relationships) {
@@ -771,7 +818,7 @@ function validateEr() {
       // entity.width is optional; validateEr sees the authored object, so the
       // overflow check must use the resolved width or an omitted width turns the
       // available space into NaN and silently skips the diagnostic.
-      const available = entityWidth(entity) - layout.padX * 2 - layout.keyWidth;
+      const available = entityWidth(entity) - layout.padX * 2 - keyColumnWidth(entity);
       const needed = nameUnits * layout.rowFont + (typeUnits ? typeUnits * layout.typeFont + 8 : 0);
       if (needed > available) {
         problems.push(
@@ -965,6 +1012,7 @@ function buildLayoutReport() {
 
 // ---- Rendering ---------------------------------------------------------------
 function renderEntityColumnRows(entity) {
+  const keyColumn = keyColumnWidth(entity);
   return entity.attributes.map((attribute, index) => {
     const rowTop = entity.y + metrics.headerH + index * metrics.rowH;
     const baseline = rowTop + metrics.rowH - 5;
@@ -972,10 +1020,8 @@ function renderEntityColumnRows(entity) {
     // it: the Viewer's reader sizes the diagram from the texts that declare the
     // level themselves, so a field that is only context inside a group would be
     // shrunk past the readable floor on a tall schema.
-    const keyGlyph = attribute.key
-      ? `<text data-detail="context" x="${entity.x + layout.padX}" y="${baseline}" class="${KEY_ACCENT[attribute.key] || 't-muted'}" font-size="${layout.keyFont}" font-weight="600">${esc(attribute.key.toUpperCase())}</text>`
-      : '';
-    const nameX = entity.x + layout.padX + layout.keyWidth;
+    const keyGlyph = renderKeyGlyphs(attribute, entity.x + layout.padX, baseline);
+    const nameX = entity.x + layout.padX + keyColumn;
     const typeSpace = attribute.type ? Math.min(96, textUnits(attribute.type) * layout.typeFont * nodeTextFit.widthFactor) : 0;
     const nameFontSize = fittedNodeFontSize(
       attribute.name,

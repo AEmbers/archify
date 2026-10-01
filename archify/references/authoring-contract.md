@@ -342,15 +342,20 @@ the router can detour around it, but the clear corridor is shorter and reads
 better. Use `row`/`col` for this normal grouped layout, and only use explicit
 `pos`/`via` after a diagnostic identifies a concrete geometry problem.
 
-Put one key per attribute (`key`) and the real references in `references`. A
-many-to-many pair is a real fact about the model, so state it and identify the join
+State every key role a column carries in `key`, and the real references in
+`references`. A column is often more than one at once — a junction table's
+`tenant_id` is both part of the primary key and a foreign key to `tenant.id` — so
+`key` takes a role or a list (`["pk", "fk"]`), and dropping a role claims less
+than the schema does.
+A many-to-many pair is a real fact about the model, so state it and identify the join
 table when one exists. A relationship has two ends and each one declares its own
 maximum, so a `many`-to-`one` foreign key needs both `fromCardinality` and
 `toCardinality`; `fromOptional`/`toOptional` only lowers that same end's minimum
 from one to zero (an optional `one` end reads zero-or-one, an optional `many` end
 reads zero-or-many), and `identifying: false` draws the non-identifying dashed
-line. The foot opens toward the entity it describes, so the drawn glyph states the
-end's maximum, not a direction of travel.
+line and owns that dash — the schema rejects a `variant` that would draw the
+relationship solid beside it. The foot opens toward the entity it describes, so the
+drawn glyph states the end's maximum, not a direction of travel.
 
 A table side only has room for so many ends: the ports spread at most `(side
 extent - 32) / (ends - 1)` apart, and a cardinality glyph is 14 units tall. More
