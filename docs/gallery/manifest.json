@@ -1625,8 +1625,8 @@
       "engineeringProfile": null,
       "nodeCount": 6,
       "edgeCount": 5,
-      "artifactBytes": 768242,
-      "artifactSha256": "202e4427d71b21eb5fd008fdbc5f70d74c84cd7b6e28ba953dce38e3b75a49f8",
+      "artifactBytes": 776386,
+      "artifactSha256": "70555dd9b569961bddb1255c2d1cd0a0e3e1bc5949f09f4ae7e92042446610dd",
       "sourceBytes": 7321,
       "sourceSha256": "1777a374647084466f4d7ce3a968004be6ab70ac9cf82459b96bed7c556cdfdd",
       "checks": [
@@ -1686,7 +1686,7 @@
           "minLabelRouteClearance": 225,
           "desktopReadabilityIssues": 0,
           "viewportHeightIssues": 0,
-          "minProjectedNodeTextPx": 8.383647798742139,
+          "minProjectedNodeTextPx": 8.773584905660378,
           "maxBends": 2,
           "routesOverSuggestedBends": 0,
           "maxStretch": 1,
@@ -1727,10 +1727,10 @@
           "hardFloorMet": true,
           "minimumOwner": {
             "kind": "node",
-            "id": "order_item"
+            "id": "customer"
           },
-          "minimumSourceTextPx": 8.6,
-          "minimumProjectedTextPx": 8.383647798742139,
+          "minimumSourceTextPx": 9,
+          "minimumProjectedTextPx": 8.773584905660378,
           "semanticTextCount": 94
         },
         "issues": []
