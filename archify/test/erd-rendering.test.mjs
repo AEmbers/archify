@@ -622,9 +622,22 @@ test('a contiguous domain draws a band and a scattered tag does not', () => {
   assert.match(contiguous, /data-domain-band="catalog"/, 'a second contiguous domain earns its own band');
 
   // Two members on a diagonal: their columns and their rows are both spread, so
-  // the run is not contiguous and the tag must draw no box across the gap.
-  const scattered = band(nodes((id) => (id === 'alpha' || id === 'delta' ? 'checkout' : 'other')), links);
-  assert.doesNotMatch(scattered, /data-domain-band="checkout"/, 'a tag split across the canvas draws no band');
+  // no band can be measured, and the band is the only place a domain name is
+  // drawn. The render names the problem instead of drawing nothing for the tag.
+  const scatteredDiagram = {
+    schema_version: 1,
+    diagram_type: 'erd',
+    meta: { title: 'Domains', locale: 'en' },
+    layout: { mode: 'grid' },
+    entities: nodes((id) => (id === 'alpha' || id === 'delta' ? 'checkout' : 'other')),
+    relationships: links,
+  };
+  const scatteredDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-band-scattered-'));
+  const scattered = render(scatteredDiagram, scatteredDirectory);
+  assert.notEqual(scattered.status, 0, 'a tag split across the canvas must not render');
+  assert.match(scattered.stderr + scattered.stdout, /erd\/domain-not-drawn/);
+  assert.match(scattered.stderr + scattered.stdout, /"alpha", "delta" do not fill a solid block/);
+  assert.equal(fs.existsSync(scattered.output), false, 'the diagram is not written at all');
 });
 
 // Port spacing and glyph ink are what make both ends readable: the shared 14px
@@ -953,7 +966,7 @@ test('a bundled trunk is painted under the markers it passes', () => {
 });
 
 
-test('table title and explicit note occupy separate header intervals or fail with capacity evidence', () => {
+test('the header draws the centered title alone and reports a title that cannot fit', () => {
   const diagram = cloneWithoutViews(example);
   diagram.entities = [{
     id: 'subscription', label: 'customer_subscription', sublabel: 'billing',
@@ -966,30 +979,133 @@ test('table title and explicit note occupy separate header intervals or fail wit
   assert.equal(success.status, 0, success.stderr);
   const html = fs.readFileSync(success.output, 'utf8');
   const title = attrs(html.match(/<text data-node-label=""[^>]*>customer_subscription<\/text>/)[0]);
-  const note = attrs(html.match(/<text[^>]*>billing<\/text>/)[0]);
-  // Same-line bounds use the renderer's conservative text advance, including
-  // the explicit 12-unit separation between independently authored strings.
-  const titleRight = +title.x + 'customer_subscription'.length * +title['font-size'] * 0.6;
-  const noteLeft = +note.x - 'billing'.length * +note['font-size'] * 0.6;
-  assert.equal(title.y, note.y);
-  assert.ok(noteLeft - titleRight >= 11.9, `header text must stay apart: ${titleRight}, ${noteLeft}`);
+  // The title is centered, so its x is the anchor, not its left edge.
+  assert.equal(title['text-anchor'], 'middle', 'the table title is centered on its own center line');
   assert.deepEqual(entityBoxes(html).get('subscription'), { x: 40, y: 80, width: 240, height: 56 });
 
-  diagram.entities[0].sublabel = 'An explicitly authored billing ownership note that cannot fit';
+  // The header carries the title alone. The author's note stays on the node,
+  // where the accessible name and the node index read it, but it is not drawn.
+  assert.doesNotMatch(html, /<text[^>]*>billing<\/text>/, 'the authored note is not drawn');
+  assert.match(html, /data-node-sublabel="billing"/, 'the authored note stays on the node');
+
+  // A short title has the room to sit on the center line exactly, and it takes
+  // it: the clamp only moves a title that would otherwise reach a bound.
+  const shortDiagram = cloneWithoutViews(example);
+  shortDiagram.entities = [{
+    id: 'subscription', label: 'sub', sublabel: 'billing',
+    pos: [40, 80], width: 240,
+    attributes: [{ name: 'id', type: 'bigint', key: 'pk' }],
+  }];
+  shortDiagram.relationships = [];
+  const shortDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-header-short-'));
+  const short = render(shortDiagram, shortDirectory);
+  assert.equal(short.status, 0, short.stderr);
+  const shortTitle = attrs(fs.readFileSync(short.output, 'utf8').match(/<text data-node-label=""[^>]*>sub<\/text>/)[0]);
+  assert.equal(+shortTitle.x, 40 + 240 / 2, 'a short title sits on the table center line');
+
+  // A title with the whole interval to itself can be wide enough that the
+  // unclamped center line would push it into the sigil porch. The clamp holds
+  // it at the bound and lets it sit right of the center line it cannot use.
+  const wideDiagram = cloneWithoutViews(example);
+  wideDiagram.entities = [{
+    id: 'subscription', label: 'subscription_billing_cycle',
+    pos: [40, 80], width: 240,
+    attributes: [{ name: 'id', type: 'bigint', key: 'pk' }],
+  }];
+  wideDiagram.relationships = [];
+  const wideDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-header-wide-'));
+  const wide = render(wideDiagram, wideDirectory);
+  assert.equal(wide.status, 0, wide.stderr);
+  const wideTitle = attrs(fs.readFileSync(wide.output, 'utf8').match(/<text data-node-label=""[^>]*>subscription_billing_cycle<\/text>/)[0]);
+  const wideLeft = +wideTitle.x - 'subscription_billing_cycle'.length * +wideTitle['font-size'] * 0.6 / 2;
+  assert.ok(wideLeft >= 69.9, `a title wide enough to reach the porch is held at the bound (got ${wideLeft})`);
+  assert.ok(+wideTitle.x > 40 + 240 / 2, `and it sits right of the center line it could not use (got ${wideTitle.x})`);
+
+  // The header is one string wide, so a title past the interval has no second
+  // place to go: the render names it instead of shrinking it past readability.
+  diagram.entities[0].label = 'customer_subscription_billing_cycle_archive';
   const failureDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-header-capacity-'));
   const failure = render(diagram, failureDirectory);
-  assert.notEqual(failure.status, 0, 'an oversized explicit note must never be silently dropped');
+  assert.notEqual(failure.status, 0, 'an oversized title must never be drawn past the header');
   assert.match(failure.stderr + failure.stdout, /erd\/header-text-capacity/);
   assert.equal(fs.existsSync(failure.output), false);
+});
 
-  diagram.layout = { mode: 'grid', headerH: 40 };
-  diagram.entities[0].sublabel = 'billing ownership';
-  diagram.entities[0].width = 200;
-  const twoLineDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-header-two-lines-'));
-  const twoLine = render(diagram, twoLineDirectory);
-  assert.equal(twoLine.status, 0, twoLine.stderr);
-  const twoLineHtml = fs.readFileSync(twoLine.output, 'utf8');
-  const separateTitle = attrs(twoLineHtml.match(/<text data-node-label=""[^>]*>customer_subscription<\/text>/)[0]);
-  const separateNote = attrs(twoLineHtml.match(/<text[^>]*>billing ownership<\/text>/)[0]);
-  assert.ok(+separateNote.y > +separateTitle.y, 'an authored taller header can use the spare line');
+test('a domain that cannot be drawn as a band stops the render instead of losing its name', () => {
+  // A domain is named by its band, and the header carries the table title alone,
+  // so a tag that cannot be banded would leave the domain unnamed on the canvas.
+  const base = cloneWithoutViews(example);
+  const table = (id, row, col, tag) => ({
+    id, label: id, tag, row, col,
+    attributes: [{ name: 'id', type: 'bigint', key: 'pk' }],
+  });
+
+  const solid = clone(base);
+  solid.entities = [
+    table('a', 0, 0, 'core'), table('b', 0, 1, 'core'),
+    table('c', 1, 0, 'core'), table('d', 1, 1, 'core'),
+  ];
+  solid.relationships = [];
+  const solidDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-domain-block-'));
+  const solidRun = render(solid, solidDirectory);
+  assert.equal(solidRun.status, 0, solidRun.stderr);
+  assert.match(fs.readFileSync(solidRun.output, 'utf8'), /data-domain-band="core"/,
+    'a block of grid cells is drawn as a band');
+
+  // One row and one column are the same claim with a dimension of one.
+  for (const [name, cells] of [['row', [[0, 0], [0, 1], [0, 2]]], ['column', [[0, 0], [1, 0], [2, 0]]]]) {
+    const strip = clone(base);
+    strip.entities = cells.map(([row, col], index) => table(`t${index}`, row, col, 'core'));
+    strip.relationships = [];
+    const stripDirectory = fs.mkdtempSync(path.join(os.tmpdir(), `archify-er-domain-${name}-`));
+    const stripRun = render(strip, stripDirectory);
+    assert.equal(stripRun.status, 0, stripRun.stderr);
+    assert.match(fs.readFileSync(stripRun.output, 'utf8'), /data-domain-band="core"/, `a ${name} is a band`);
+  }
+
+  // An L does not fill its bounding box: a band would claim the empty cell.
+  const ell = clone(base);
+  ell.entities = [table('a', 0, 0, 'core'), table('b', 0, 1, 'core'), table('c', 1, 0, 'core')];
+  ell.relationships = [];
+  const ellDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-domain-ell-'));
+  const ellRun = render(ell, ellDirectory);
+  assert.notEqual(ellRun.status, 0, 'an L-shaped domain must not be banded');
+  assert.match(ellRun.stderr + ellRun.stdout, /erd\/domain-not-drawn/);
+  assert.match(ellRun.stderr + ellRun.stdout, /"a", "b", "c" do not fill a solid block/);
+  assert.equal(fs.existsSync(ellRun.output), false, 'nothing is written when a domain cannot be named');
+
+  // Absolute coordinates have no cells to group, so a tag cannot be drawn there.
+  const absolute = clone(base);
+  absolute.entities = [{
+    id: 'solo', label: 'solo', tag: 'core', pos: [40, 80],
+    attributes: [{ name: 'id', type: 'bigint', key: 'pk' }],
+  }];
+  absolute.relationships = [];
+  const absoluteDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-domain-pos-'));
+  const absoluteRun = render(absolute, absoluteDirectory);
+  assert.notEqual(absoluteRun.status, 0, 'a tagged table outside the grid must not render');
+  assert.match(absoluteRun.stderr + absoluteRun.stdout, /have no grid cells, and a band is measured from them/);
+
+  // Two members in one cell is the grid placement check's report, not the
+  // domain's: the author gets the pair that has to move, not a block to build.
+  const shared = clone(base);
+  shared.entities = [table('a', 0, 0, 'core'), table('b', 0, 0, 'core')];
+  shared.relationships = [];
+  const sharedDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-domain-shared-'));
+  const sharedRun = render(shared, sharedDirectory);
+  assert.notEqual(sharedRun.status, 0, 'two tables in one cell must not render');
+  assert.match(sharedRun.stderr + sharedRun.stdout, /share grid cell/);
+  assert.doesNotMatch(sharedRun.stderr + sharedRun.stdout, /do not fill a solid block/,
+    'the domain check defers to the placement error instead of blaming the block');
+
+  // A table with no tag groups nothing and stays placeable by coordinates.
+  const untagged = clone(base);
+  untagged.entities = [{
+    id: 'solo', label: 'solo', pos: [40, 80],
+    attributes: [{ name: 'id', type: 'bigint', key: 'pk' }],
+  }];
+  untagged.relationships = [];
+  const untaggedDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-domain-untagged-'));
+  const untaggedRun = render(untagged, untaggedDirectory);
+  assert.equal(untaggedRun.status, 0, untaggedRun.stderr);
 });

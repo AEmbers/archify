@@ -113,25 +113,34 @@ text cannot fit inside the declared entity width.
 ## Domain bands
 
 `tag` names a table's functional domain, and a domain is drawn as a band when the
-tables carrying that tag occupy a contiguous run of grid cells — one row with
-adjacent columns, or one column with adjacent rows. The band is measured from the
-placed boxes and carries the tag as its caption, which is what makes a grouped
-schema readable at a glance: the reader sees blocks instead of six equally
-weighted boxes.
+tables carrying that tag fill a solid block of grid cells — every cell of their
+bounding box holds one of them. A single row, a single column, and a block are
+all that same claim, and a one-table domain is that claim at its smallest. The
+band is measured from the placed boxes and carries the tag as its caption, which
+is what makes a grouped schema readable at a glance: the reader sees blocks
+instead of six equally weighted boxes.
 
-A tag spread across the canvas earns no band, because a band around the gap would
-claim a grouping the placement contradicts; that tag stays in the table header
-instead, together with any `sublabel`. A single-table domain always reads that
-way. `sublabel` is the per-table note and is never drawn on a band.
+A tag whose members do not fill one block earns no band, because a band around
+them would enclose cells the domain does not own and claim a grouping the
+placement contradicts. The band is the only place a domain name is drawn, so the
+renderer returns `erd/domain-not-drawn` rather than publishing a diagram whose
+tables are complete and whose domain cannot be named. Move the members into one
+block, split the tag, or drop it. The same diagnostic covers the other ways the
+name can go missing: a member placed outside the grid, because a band is measured
+from cells and absolute coordinates have none; two members in one cell, which the
+grid placement check reports instead so the author gets the pair that has to move;
+a band whose padding would cover an unrelated table, which happens when
+`layout.gapX`/`gapY` are smaller than the padding; and a caption the canvas does
+not reach, which a `layout.origin` closer to the edge than the padding produces.
 
-The title and header note share the measured width of the header. The note
-stays right-aligned with a clear gap from the left-aligned title. If both cannot
-fit at readable sizes, the renderer returns `erd/header-text-capacity` rather
-than hiding authored information. Widen the table, shorten its title or note,
-or explicitly set `layout.headerH` to at least 40 to allow a second line.
-Existing header and entity dimensions are preserved unless the author changes
-them. Banded tables still show the domain on the band rather than repeating it
-in the header.
+The header carries the table title alone. It is centered on the table's own
+center line and held inside the interval it is measured against — the sigil porch
+on the left, the padding on the right — so it does not run past either while the
+shared text model's advance estimate holds. A title that cannot fit the header at
+a readable size raises `erd/header-text-capacity`; widen the table or shorten the
+title. Existing header and entity dimensions are preserved unless the author
+changes them. An authored `sublabel` is not drawn: it stays on the node as
+`data-node-sublabel` and in the accessible name.
 
 ## Cardinality ink
 

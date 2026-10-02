@@ -77,8 +77,6 @@ const layout = {
   rowFontMinimum: 9,
   typeFont: 10.5,
   typeFontMinimum: 9,
-  detailPreferred: 10,
-  detailMinimum: 8,
   minRelationshipLength: 24,
 };
 
@@ -162,22 +160,35 @@ const relationships = asArray(er.relationships);
 // A `tag` names a domain, and a domain has to read as one block. The band is
 // measured from the placed boxes of the entities that carry the tag, so it
 // follows the authored grid instead of introducing a second layout pass. Only a
-// run that is genuinely contiguous (one row with adjacent columns, or one column
-// with adjacent rows) earns a band: a tag whose members are spread across the
-// canvas is a grouping the author did not actually make, and drawing a band
-// around the gap would claim a structure the table placement contradicts. A
-// single-member or scattered tag still shows in its table's header note.
+// block the members actually fill earns a band: a tag whose members are spread
+// across the canvas is a grouping the author did not actually make, and drawing
+// a band around the gap would claim a structure the table placement contradicts.
+// Since the band is the only place a domain name is drawn, an unbandable tag is
+// refused rather than published unnamed; see `erd/domain-not-drawn`.
 const DOMAIN_PAD_X = 12;
 const DOMAIN_PAD_TOP = 18;
 const DOMAIN_PAD_BOTTOM = 8;
 
+// A domain is drawn as a band when its members fill a solid block of grid cells:
+// every cell of the bounding box holds one of them, so the band encloses no cell
+// the domain does not own. A single row or column, the common case, is that same
+// claim with one dimension of one.
 function gridRunIsContiguous(members) {
-  const cols = [...new Set(members.map((entity) => entity.col))].sort((a, b) => a - b);
-  const rows = [...new Set(members.map((entity) => entity.row))].sort((a, b) => a - b);
-  const adjacent = (values) => values.every((value, index) => index === 0 || value === values[index - 1] + 1);
-  if (rows.length === 1) return adjacent(cols);
-  if (cols.length === 1) return adjacent(rows);
-  return false;
+  const cols = members.map((entity) => entity.col);
+  const rows = members.map((entity) => entity.row);
+  const cells = new Set(members.map((entity) => `${entity.row}:${entity.col}`));
+  if (cells.size !== members.length) return false;
+  const box = (Math.max(...cols) - Math.min(...cols) + 1) * (Math.max(...rows) - Math.min(...rows) + 1);
+  return cells.size === box;
+}
+
+// A band is measured from grid cells, so it can only follow a table that is
+// placed by them. A table that also declares `pos` is drawn at that point
+// whatever its cells say, and banding it would wrap a box the domain does not
+// own around wherever the author put it.
+function placedByGrid(entity) {
+  return Number.isInteger(entity.row) && Number.isInteger(entity.col)
+    && !(Array.isArray(entity.pos) && entity.pos.length === 2);
 }
 
 const domainGroups = (() => {
@@ -189,30 +200,67 @@ const domainGroups = (() => {
   }
   const groups = [];
   for (const [tag, members] of byTag) {
-    if (members.length < 2) continue;
-    if (!members.every((entity) => Number.isInteger(entity.row) && Number.isInteger(entity.col))) continue;
+    if (!members.every(placedByGrid)) continue;
     if (!gridRunIsContiguous(members)) continue;
     groups.push({ tag, members });
   }
   return groups;
 })();
 
-const bandedEntityIds = new Set(domainGroups.flatMap((group) => group.members.map((entity) => entity.id)));
+// A band is the only place a domain name is drawn, because the header carries
+// the table title alone. A tag whose members cannot form one therefore loses its
+// name from the canvas while the tables look complete, so the render refuses the
+// document instead of drawing a domain the reader cannot name.
+const unlabelableDomains = (() => {
+  const banded = new Set(domainGroups.map((group) => group.tag));
+  const byTag = new Map();
+  for (const entity of entities.values()) {
+    if (!entity.tag || banded.has(entity.tag)) continue;
+    if (!byTag.has(entity.tag)) byTag.set(entity.tag, []);
+    byTag.get(entity.tag).push(entity);
+  }
+  return [...byTag.entries()].map(([tag, members]) => {
+    const gridPlaced = members.every(placedByGrid);
+    // Two members can share a cell, which the grid placement check already
+    // reports with the pair that has to move; do not also blame the block.
+    const sharedCell = gridPlaced
+      && new Set(members.map((entity) => `${entity.row}:${entity.col}`)).size !== members.length;
+    return {
+      tag,
+      members,
+      reason: sharedCell ? 'shared-cell' : gridPlaced ? 'scattered' : 'no-grid',
+      offGrid: members.filter((entity) => !placedByGrid(entity)).map((entity) => entity.id),
+    };
+  });
+})();
+
+// The band box and the caption the band draws, measured once so the drawing and
+// the capacity check cannot disagree about where the domain name lands.
+function domainBandBox(members) {
+  const minX = Math.min(...members.map((entity) => entity.x));
+  const minY = Math.min(...members.map((entity) => entity.y));
+  const maxX = Math.max(...members.map((entity) => entity.x + entity.width));
+  const maxY = Math.max(...members.map((entity) => entity.y + entity.height));
+  return {
+    x: minX - DOMAIN_PAD_X,
+    y: minY - DOMAIN_PAD_TOP,
+    width: maxX - minX + DOMAIN_PAD_X * 2,
+    height: maxY - minY + DOMAIN_PAD_TOP + DOMAIN_PAD_BOTTOM,
+  };
+}
+
+function domainBandCaption(box) {
+  return { x: box.x + 10, y: box.y + 13 };
+}
 
 function renderDomainBands() {
   if (!domainGroups.length) return '';
   return domainGroups.map(({ tag, members }) => {
-    const minX = Math.min(...members.map((entity) => entity.x));
-    const minY = Math.min(...members.map((entity) => entity.y));
-    const maxX = Math.max(...members.map((entity) => entity.x + entity.width));
-    const maxY = Math.max(...members.map((entity) => entity.y + entity.height));
-    const x = minX - DOMAIN_PAD_X;
-    const y = minY - DOMAIN_PAD_TOP;
-    const width = maxX - minX + DOMAIN_PAD_X * 2;
-    const height = maxY - minY + DOMAIN_PAD_TOP + DOMAIN_PAD_BOTTOM;
+    const box = domainBandBox(members);
+    const caption = domainBandCaption(box);
     return `        <g data-domain-band="${esc(tag)}">
-          <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="8" class="c-lane" stroke-width="1"/>
-          <text data-domain-label="" x="${x + 10}" y="${y + 13}" class="t-muted" font-size="9" font-weight="700">${esc(tag)}</text>
+          <rect x="${box.x}" y="${box.y}" width="${box.width}" height="${box.height}" rx="8" class="c-lane" stroke-width="1"/>
+          <text data-domain-label="" x="${caption.x}" y="${caption.y}" class="t-muted" font-size="9" font-weight="700">${esc(tag)}</text>
         </g>`;
   }).join('\n');
 }
@@ -830,59 +878,99 @@ function rowTextWidths(attribute) {
   return { name, type };
 }
 
-// Measure the title and note together: each owns a disjoint interval rather
-// than independently fitting against the entire header. A second line is only
-// possible when the author's existing header has enough height; never resize
-// the table or hide an explicit note to make it pass.
+// The header carries one string: the table title. A domain that earns a band is
+// named by the band, and a tagged table the renderer cannot band is refused
+// outright, so nothing depends on the header to carry a name.
 function entityHeader(entity) {
-  const detail = entity.sublabel ?? (bandedEntityIds.has(entity.id) ? undefined : entity.tag);
   const titleInset = 30;
   const titleWidth = entity.width - titleInset - layout.padX;
-  const advance = (text, font) => textUnits(text) * font * nodeTextFit.widthFactor;
-  let detailFont = detail ? layout.detailPreferred : 0;
-  let labelFont = fittedNodeFontSize(entity.label, titleWidth + nodeTextFit.horizontalPadding, layout.headerFont, layout.headerFontMinimum);
-  const labelY = 19;
-  let detailY = labelY;
-  let detailWidth = detail ? advance(detail, detailFont) : 0;
-  if (detail) {
-    const gap = 12;
-    const minLabelWidth = advance(entity.label, layout.headerFontMinimum);
-    const noteCapacity = titleWidth - minLabelWidth - gap;
-    detailFont = fittedNodeFontSize(detail, noteCapacity + nodeTextFit.horizontalPadding, layout.detailPreferred, layout.detailMinimum);
-    detailWidth = advance(detail, detailFont);
-    labelFont = fittedNodeFontSize(entity.label, titleWidth - detailWidth - gap + nodeTextFit.horizontalPadding, layout.headerFont, layout.headerFontMinimum);
-    if (advance(entity.label, labelFont) + detailWidth + gap > titleWidth) {
-      if (metrics.headerH >= 40) {
-        labelFont = fittedNodeFontSize(entity.label, titleWidth + nodeTextFit.horizontalPadding, layout.headerFont, layout.headerFontMinimum);
-        detailFont = fittedNodeFontSize(detail, titleWidth + nodeTextFit.horizontalPadding, layout.detailPreferred, layout.detailMinimum);
-        detailWidth = advance(detail, detailFont);
-        detailY = 33;
-      } else return { problem: true, detail, titleWidth };
-    }
-  }
-  if (advance(entity.label, labelFont) > titleWidth || detailWidth > titleWidth) {
-    return { problem: true, detail, titleWidth };
-  }
-  return { detail, labelFont, detailFont, labelY, detailY, titleInset };
+  const labelFont = fittedNodeFontSize(entity.label, titleWidth + nodeTextFit.horizontalPadding, layout.headerFont, layout.headerFontMinimum);
+  const labelWidth = textUnits(entity.label) * labelFont * nodeTextFit.widthFactor;
+  if (labelWidth > titleWidth) return { problem: true, titleWidth };
+  // The title is centered on the table's own center line. It is measured against
+  // a narrower interval than the box — the sigil porch on the left, the padding
+  // on the right — so a title that nearly fills that interval is held inside it
+  // rather than left to reach either edge.
+  const leftEdge = entity.x + titleInset;
+  const rightEdge = leftEdge + titleWidth;
+  const labelX = Math.round(Math.min(Math.max(entity.x + entity.width / 2, leftEdge + labelWidth / 2), rightEdge - labelWidth / 2) * 10) / 10;
+  return { labelFont, labelY: 19, labelX };
 }
 
 function validateEr() {
   const problems = [];
   const headerDetails = [];
+  const domainDetails = [];
   for (const entity of entities.values()) {
     const header = entityHeader(entity);
     if (!header.problem) continue;
-    const message = `Entity "${entity.id}" title and header note do not fit at readable sizes — widen the entity, shorten the text, or increase layout.headerH to at least 40 for a second line.`;
+    const message = `Entity "${entity.id}" title does not fit the header at a readable size — widen the entity or shorten the title.`;
     problems.push(message);
     headerDetails.push({
       code: 'erd/header-text-capacity', severity: 'error', message,
       subject: { diagramType: 'erd', entityId: entity.id },
-      evidence: { label: entity.label, detail: header.detail, availableWidth: header.titleWidth, headerHeight: metrics.headerH },
-      supportedFixes: ['Widen the entity.', 'Shorten the title or header note.', 'Increase layout.headerH to at least 40 for a second line.'],
+      evidence: { label: entity.label, availableWidth: header.titleWidth, headerHeight: metrics.headerH },
+      supportedFixes: ['Widen the entity.', 'Shorten the title.'],
+    });
+  }
+  for (const domain of unlabelableDomains) {
+    // A shared cell is already reported by the grid placement check, with the
+    // pair that has to move; blaming the block as well would give the author two
+    // fixes for one mistake.
+    if (domain.reason === 'shared-cell') continue;
+    const members = domain.members.map((entity) => entity.id);
+    const listed = members.map((id) => `"${id}"`).join(', ');
+    const offGrid = domain.offGrid.map((id) => `"${id}"`).join(', ');
+    const message = domain.reason === 'no-grid'
+      ? `Domain "${domain.tag}" is named but cannot be drawn: ${offGrid} have no grid cells, and a band is measured from them. Give every member row/col cells, or drop the tag.`
+      : `Domain "${domain.tag}" is named but cannot be drawn: ${listed} do not fill a solid block of grid cells, and a band around them would enclose cells the domain does not own. Move them into one block, or split the tag.`;
+    problems.push(message);
+    domainDetails.push({
+      code: 'erd/domain-not-drawn', severity: 'error', message,
+      subject: { diagramType: 'erd', entityId: members[0], domain: domain.tag },
+      evidence: { domain: domain.tag, entities: members, reason: domain.reason, offGrid: domain.offGrid },
+      supportedFixes: domain.reason === 'no-grid'
+        ? ['Give every domain member row/col cells.', 'Drop the tag to group nothing.']
+        : ['Give the domain members one solid block of grid cells.', 'Split the tag so each domain can be drawn as a band.', 'Drop the tag to group nothing.'],
+    });
+  }
+  // The band draws the domain name, so a band the canvas cannot show would put
+  // the domain back to unnamed. The caption is what has to land inside; it sits
+  // a few units into the band from its top-left corner.
+  for (const { tag, members } of domainGroups) {
+    const caption = domainBandCaption(domainBandBox(members));
+    if (caption.x >= 4 && caption.y >= 4 && caption.y <= viewBox[1] - 4 && caption.x <= viewBox[0] - 4) continue;
+    const listed = members.map((entity) => `"${entity.id}"`).join(', ');
+    const message = `Domain "${tag}" is named but cannot be drawn: the canvas does not reach the band caption for ${listed} at (${caption.x}, ${caption.y}). Move the domain clear of the canvas edge, or drop the tag.`;
+    problems.push(message);
+    domainDetails.push({
+      code: 'erd/domain-not-drawn', severity: 'error', message,
+      subject: { diagramType: 'erd', entityId: members[0].id, domain: tag },
+      evidence: { domain: tag, entities: members.map((entity) => entity.id), reason: 'off-canvas', caption, viewBox },
+      supportedFixes: ['Move the domain clear of the canvas edge.', 'Drop the tag to group nothing.'],
+    });
+  }
+  // A band claims the box it covers. With gaps smaller than the band padding the
+  // box reaches a table the domain does not own, which is the same false claim as
+  // a band drawn across a gap.
+  const memberIds = new Set([...domainGroups.flatMap((group) => group.members)].map((entity) => entity.id));
+  for (const { tag, members } of domainGroups) {
+    const box = domainBandBox(members);
+    const intruder = [...entities.values()].find((entity) => !memberIds.has(entity.id)
+      && entity.x < box.x + box.width && entity.x + entity.width > box.x
+      && entity.y < box.y + box.height && entity.y + entity.height > box.y);
+    if (!intruder) continue;
+    const listed = members.map((entity) => `"${entity.id}"`).join(', ');
+    const message = `Domain "${tag}" is named but cannot be drawn: its band would cover the unrelated table "${intruder.id}". Widen layout.gapX/gapY past the band padding, or split the tag.`;
+    problems.push(message);
+    domainDetails.push({
+      code: 'erd/domain-not-drawn', severity: 'error', message,
+      subject: { diagramType: 'erd', entityId: members[0].id, domain: tag },
+      evidence: { domain: tag, entities: members.map((entity) => entity.id), reason: 'band-covers-entity', band: box, coveredEntity: intruder.id },
+      supportedFixes: ['Widen layout.gapX/gapY past the band padding.', 'Split the tag so each band covers only its own tables.'],
     });
   }
   validateErGridPlacement(er, grid, bands, problems);
-
   const seenEntityIds = new Set();
   for (const entity of asArray(er.entities)) {
     if (seenEntityIds.has(entity.id)) problems.push(`Entity ids must be unique; "${entity.id}" is declared twice.`);
@@ -1072,7 +1160,7 @@ function validateEr() {
     throwDiagnosticProblems('Entity-relationship layout validation failed', problems, {
       code: 'layout/constraint',
       subject: { diagramType: 'erd' },
-      diagnostics: [...headerDetails, ...portSpacingDetails],
+      diagnostics: [...headerDetails, ...domainDetails, ...portSpacingDetails],
     });
   }
 }
@@ -1126,16 +1214,13 @@ function renderEntityColumnRows(entity) {
 
 function renderEntity(entity) {
   const header = entity.y + metrics.headerH;
-  const { detail, labelFont, detailFont, labelY, detailY, titleInset } = entityHeader(entity);
+  const { labelFont, labelY, labelX } = entityHeader(entity);
   const passport = {
     kind: 'database',
     sublabel: entity.sublabel,
     tag: entity.tag,
     context: i18nText(er.meta.locale, 'node.context.erd'),
   };
-  const sublabel = detail
-    ? `\n          <text data-detail="context" x="${entity.x + entity.width - layout.padX}" y="${entity.y + detailY}" class="er-type" font-size="${detailFont}" text-anchor="end">${esc(detail)}</text>`
-    : '';
   const rows = renderEntityColumnRows(entity);
   return `        <g ${focusNodeAttrs(entity.id, entity.label, passport, er.meta.locale)}>
           ${focusNodeTitle(entity.label, passport)}
@@ -1143,7 +1228,7 @@ function renderEntity(entity) {
           <rect x="${entity.x}" y="${entity.y}" width="${entity.width}" height="${entity.height}" rx="5" class="c-database er-table"${animateAttr(er.meta, 'node', entitySteps.get(entity.id))} stroke-width="1.5"/>
           <path class="er-table-header" d="M ${entity.x + 5} ${entity.y} H ${entity.x + entity.width - 5} Q ${entity.x + entity.width} ${entity.y} ${entity.x + entity.width} ${entity.y + 5} V ${header} H ${entity.x} V ${entity.y + 5} Q ${entity.x} ${entity.y} ${entity.x + 5} ${entity.y} Z"/>
           ${renderSemanticSigil('database', { x: entity.x + 8, y: entity.y + 7, size: 14 })}
-          <text data-node-label="" x="${entity.x + titleInset}" y="${entity.y + labelY}" class="t-primary" font-size="${labelFont}" font-weight="700">${esc(entity.label)}</text>${sublabel}
+          <text data-node-label="" x="${labelX}" y="${entity.y + labelY}" class="t-primary" font-size="${labelFont}" font-weight="700" text-anchor="middle">${esc(entity.label)}</text>
           <line x1="${entity.x}" y1="${header}" x2="${entity.x + entity.width}" y2="${header}" class="c-grid" stroke-width="1"/>
 ${rows}
         </g>`;

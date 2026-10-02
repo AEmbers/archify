@@ -327,13 +327,17 @@ replace a field list.
 
 Before placing boxes, classify tables into functional domains using verified table
 names, comments, module paths, and foreign-key meaning. Put the domain name in
-`tag` and give each domain one contiguous run of grid cells: a single row with
-adjacent columns, or a single column with adjacent rows. All tables with the same
-tag stay together; do not interleave unrelated tables between members. A domain
-that forms one such run is drawn as a labelled band behind its tables, so the
+`tag` and give each domain one solid block of grid cells: a single row, a single
+column, or a full block, with every cell of the block holding one of its tables.
+All tables with the same tag stay together; do not interleave unrelated tables
+between members. A domain that fills one such block is drawn as a labelled band
+behind its tables, so the
 grouping is visible without reading every box;
-a tag spread across the canvas earns no band and stays in that table's header
-instead, which is also how a single-table domain reads. Order parent/core tables
+a tag whose tables do not fill one block earns no band, and because the band is
+the only place a domain name is drawn the renderer reports `erd/domain-not-drawn`
+rather than publishing a diagram that cannot name the domain. Absolute
+coordinates have no grid cells at all, so a tagged table always needs `row`/`col`.
+Order parent/core tables
 toward the shared boundary and
 place their direct children beside or beneath them. Columns read left to right and
 rows read top to bottom, so a relationship between neighbouring columns is one
