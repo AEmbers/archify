@@ -79,24 +79,34 @@ legend label overrides, and cards. A bilingual diagram still
 chooses one primary locale for the Viewer; follow an explicit primary-language
 request, then prompt order or conversation dominance.
 
-`en` and `zh-CN` are built-in Viewer catalogs and need nothing further. For
-every other `meta.locale`, also set `meta.translations`: an object mapping the
-renderer's canonical message keys (`catalogKeys()` in
-`renderers/shared/i18n.mjs`) to translated strings whose `{placeholder}` tokens
-match the English source exactly. Reuse suitable translations from `examples/locales/` or a previously reviewed
-catalog; Spanish uses `examples/locales/es.json`. Translate missing keys or adapt terminology when the diagram needs it;
-use the English source to check keys and placeholders. Example catalogs may
-lag new Viewer keys; validation reports those gaps and uses English for them. A key that is missing, unrecognized, or has mismatched
-placeholders falls back to its English string — `validate`/`render`/`deliver`
-report the resulting coverage to stderr — rather than breaking the render or
-silently shipping an untranslated string as if it were translated.
+Bundled Viewer catalogs are enrolled in `locales/manifest.json`: currently
+`en`, `zh-CN`, `es`, and `ko`. For these, `meta.locale` alone selects the full
+catalog. Tags match case-insensitively (`zh-cn` selects `zh-CN`), but region
+and script variants are distinct: `zh-Hant`, `es-MX`, or `ko-KR` select no
+bundled catalog.
 
-For older dev inputs using only `meta.locale: "es"`, copy the Spanish catalog
-into `meta.translations` before rendering again. Existing standalone HTML
-keeps its embedded translations.
+`meta.translations` is an optional per-key override: an object mapping the
+renderer's canonical message keys (`locales/en.json`, or `catalogKeys()` in
+`renderers/shared/i18n.mjs`) to translated strings whose `{placeholder}` tokens
+match the English source exactly. Each message resolves as: valid
+`meta.translations` value → the selected bundled catalog → English. For a
+bundled locale, supply only the keys whose wording the diagram needs to change;
+the rest of the language is kept. Omitting the field or supplying `{}` means no
+override. For a language without a bundled catalog, supply the catalog here.
+Reuse suitable translations from `examples/locales/` or a previously reviewed
+catalog, translate missing keys, and use the English source to check keys and
+placeholders.
+
+An unknown key or a value with mismatched placeholders is rejected and keeps
+the lower-priority message; it is reported as `i18n/invalid-translation` on
+stderr and as a warning in the `validate --json`, `deliver`, and `finalize`
+receipt `diagnostics[]`. Keys that still resolve to English in a
+non-English locale are reported as `i18n/translation-coverage`, with the missing
+keys and their English source text; add exactly those keys to repair the gap.
+Coverage describes the final resolved catalog, not the size of the override.
 
 For a requested language you cannot supply `meta.translations` for, do not
-write a `meta.locale` with no built-in catalog and no translations. Keep every
+write a `meta.locale` with no bundled catalog and no translations. Keep every
 reader-facing authored string in the requested language, omit `meta.locale` so
 the renderer safely uses English, and explicitly tell the user that fixed
 Viewer UI and `<html lang>` remain English and the artifact is not fully localized.

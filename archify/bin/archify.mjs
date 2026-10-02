@@ -1871,6 +1871,21 @@ function recordDeliveryFailure(options) {
   return recorded;
 }
 
+// Locale warnings for a successfully rendered candidate. The renderer prints
+// them to stderr; receipts carry the same diagnostics from the same pure
+// resolver so an agent can repair a translation gap from structured output.
+async function specificationLocaleDiagnostics(type, specification) {
+  let meta;
+  try {
+    meta = JSON.parse(String(specification)).meta;
+  } catch {
+    return [];
+  }
+  if (!meta?.locale) return [];
+  const { localeDiagnostics } = await import('../renderers/shared/i18n.mjs');
+  return localeDiagnostics(type, meta);
+}
+
 function deliverySuccessProvenance(receipt) {
   return {
     schemaVersion: 1,
@@ -4850,6 +4865,7 @@ async function commandDeliver(args) {
       return;
     }
     const engineeringProfile = engineeringProfileFromArtifact(artifact);
+    const localeWarnings = await specificationLocaleDiagnostics(type, specification);
     const receipt = {
       schemaVersion: 1,
       receiptId,
@@ -4887,6 +4903,7 @@ async function commandDeliver(args) {
           ...(sourceEvidence.repository.linkMode ? { linkMode: sourceEvidence.repository.linkMode } : {}),
         },
       } : {}),
+      ...(localeWarnings.length ? { diagnostics: localeWarnings } : {}),
     };
 
     const provenanceBytes = Buffer.from(`${JSON.stringify(deliverySuccessProvenance(receipt), null, 2)}\n`);
@@ -5733,6 +5750,9 @@ async function commandFinalize(rawArgs) {
     console.log(`gates ${Object.entries(result.summary.gates).map(([stage, status]) => `${stage}:${status}`).join(' ')}`);
     console.log(`receipt ${result.summary.evidence.receipt}`);
     console.log(`perceptual visual review ${result.summary.visualReview}`);
+    for (const entry of result.summary.diagnostics || []) {
+      if (entry.severity === 'warning') console.error(`warning [${entry.code}] ${entry.message}`);
+    }
     if (result.summary.update?.noticeRequired) console.log(result.summary.update.noticeText);
   }
   process.exitCode = result.exitCode;
@@ -6822,6 +6842,7 @@ async function commandValidate(args) {
             ...artifactIdentity(specification),
           };
           const resolvedQuality = quality || result.composition.profile || 'standard';
+          const localeWarnings = await specificationLocaleDiagnostics(type, specification);
           console.log(JSON.stringify({
             schemaVersion: 1,
             ok: true,
@@ -6847,6 +6868,7 @@ async function commandValidate(args) {
             checks: result.checks,
             composition: result.composition,
             ...(engineeringProfile ? { engineeringProfile } : {}),
+            ...(localeWarnings.length ? { diagnostics: localeWarnings } : {}),
           }, null, 2));
         } else {
           const engineering = engineeringProfile
