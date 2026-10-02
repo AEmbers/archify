@@ -1109,3 +1109,32 @@ test('a domain that cannot be drawn as a band stops the render instead of losing
   const untaggedRun = render(untagged, untaggedDirectory);
   assert.equal(untaggedRun.status, 0, untaggedRun.stderr);
 });
+
+
+test('a domain band rejects intrusion into another tagged domain', () => {
+  const input = cloneWithoutViews(example);
+  input.entities = ['alpha', 'beta'].map((id, col) => ({
+    id, label: id, tag: `${id} domain`, row: 0, col,
+    attributes: [{ name: 'id', type: 'bigint', key: 'pk' }],
+  }));
+  input.relationships = [];
+  input.cards = [];
+  for (const orientation of ['horizontal', 'vertical']) {
+    input.layout = { mode: 'grid', gapX: 1, gapY: 1 };
+    input.entities.forEach((entity, index) => {
+      entity.row = orientation === 'vertical' ? index : 0;
+      entity.col = orientation === 'horizontal' ? index : 0;
+    });
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-domain-intrusion-'));
+    const rejected = render(input, directory);
+    assert.notEqual(rejected.status, 0, `${orientation}: tagged neighbours must not bypass membership checking`);
+    assert.match(rejected.stderr + rejected.stdout, /erd\/domain-not-drawn/);
+    assert.match(rejected.stderr + rejected.stdout, /cover the unrelated table/);
+    assert.equal(fs.existsSync(rejected.output), false);
+    input.layout.gapX = 72;
+    input.layout.gapY = 38;
+    const spacedDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'archify-er-domain-separated-'));
+    const spaced = render(input, spacedDirectory);
+    assert.equal(spaced.status, 0, spaced.stderr);
+  }
+});

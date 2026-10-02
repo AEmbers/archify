@@ -953,8 +953,8 @@ function validateEr() {
   // A band claims the box it covers. With gaps smaller than the band padding the
   // box reaches a table the domain does not own, which is the same false claim as
   // a band drawn across a gap.
-  const memberIds = new Set([...domainGroups.flatMap((group) => group.members)].map((entity) => entity.id));
   for (const { tag, members } of domainGroups) {
+    const memberIds = new Set(members.map((entity) => entity.id));
     const box = domainBandBox(members);
     const intruder = [...entities.values()].find((entity) => !memberIds.has(entity.id)
       && entity.x < box.x + box.width && entity.x + entity.width > box.x
