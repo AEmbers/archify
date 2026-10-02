@@ -436,5 +436,13 @@
   "viewer.common.copyFailed": "复制失败",
   "viewer.common.copyLink": "复制链接",
   "viewer.common.clear": "清除",
-  "viewer.common.close": "关闭"
+  "viewer.common.close": "关闭",
+  "diagram.description.erd": "由 Archify 生成的实体关系图。",
+  "node.context.erd": "实体",
+  "legend.erd.pk": "主键",
+  "legend.erd.fk": "外键",
+  "legend.erd.uk": "唯一键",
+  "legend.erd.one": "一",
+  "legend.erd.many": "多",
+  "legend.erd.optional": "可选"
 }
