@@ -1,13 +1,13 @@
 ---
 import { version, versioned } from '../data/site';
-import { packages, typeOrder, typeCounts } from '../data/community.mjs';
+import { packages, typeOrder, typeCounts, type PackageType } from '../data/community';
 import SiteLayout from '../layouts/SiteLayout.astro';
 import Navigation from '../components/Navigation.astro';
 import head from '../data/community-head.html?raw';
 import css from '../styles/community.css?raw';
 import pageScript from '../scripts/community.js?raw';
 
-const typeLabels: Record<string, { en: string; zh: string }> = {
+const typeLabels: Record<PackageType, { en: string; zh: string }> = {
   skill: { en: 'Skill pack', zh: '技能包' },
   recipe: { en: 'Recipes', zh: '场景配方' },
   'brand-marks': { en: 'Brand kit', zh: '品牌套件' },
