@@ -2,22 +2,33 @@
   "name": "archify-dsh",
   "type": "wrapper",
   "summary": {
-    "en": "DeepSeek Harness plugin registering the Archify skill as a filesystem skill provider. Published on npm as @tt-a1i/archify-dsh.",
-    "zh": "DeepSeek Harness 插件，将 Archify skill 注册为文件系统 skill provider。以 npm 包 @tt-a1i/archify-dsh 分发；宿主编写 JSON IR 并调用 Archify CLI。"
+    "en": "Published DSH skill bundle @tt-a1i/archify-dsh 0.1.0 includes Archify 2.14.0. Experimental DSH 0.1.0-rc.6 support; the 0.2.0 bundle remains unpublished.",
+    "zh": "已发布的 DSH 技能包 @tt-a1i/archify-dsh 0.1.0 内含 Archify 2.14.0，实验支持 DSH 0.1.0-rc.6；0.2.0 包尚未发布。"
   },
   "author": {
     "name": "tt-a1i",
     "url": "https://github.com/tt-a1i"
   },
-  "repository": "https://github.com/tt-a1i/archify/tree/main/integrations/deepseek-harness",
-  "homepage": "https://www.npmjs.com/package/@tt-a1i/archify-dsh",
-  "archify": ">=3.0.0 <4.0.0",
-  "schemaVersions": [1, 2],
-  "tags": ["deepseek-harness", "dsh", "npm", "integration"],
+  "repository": "https://github.com/tt-a1i/archify/tree/archify-dsh-v0.1.0/integrations/deepseek-harness",
+  "homepage": "https://www.npmjs.com/package/@tt-a1i/archify-dsh/v/0.1.0",
+  "archify": "2.14.0",
+  "schemaVersions": [
+    1
+  ],
+  "tags": [
+    "deepseek-harness",
+    "dsh",
+    "npm",
+    "integration"
+  ],
   "evidence": [
     {
-      "label": "Pinned skill source commit",
-      "url": "https://github.com/tt-a1i/archify/blob/main/integrations/deepseek-harness/release.json"
+      "label": "Published 0.1.0 integration guide",
+      "url": "https://github.com/tt-a1i/archify/blob/archify-dsh-v0.1.0/integrations/deepseek-harness/README.md"
+    },
+    {
+      "label": "Bundled Archify 2.14.0 source",
+      "url": "https://github.com/tt-a1i/archify/blob/archify-dsh-v0.1.0/archify/package.json"
     }
   ]
 }

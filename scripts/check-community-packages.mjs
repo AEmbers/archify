@@ -16,7 +16,7 @@ export const PACKAGE_TYPES = Object.freeze(['skill', 'recipe', 'brand-marks', 'l
 export const REQUIRED_FIELDS = Object.freeze(['name', 'type', 'summary', 'author', 'repository', 'archify', 'schemaVersions']);
 const ALLOWED_FIELDS = new Set([...REQUIRED_FIELDS, 'homepage', 'tags', 'evidence']);
 const NAME_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
-const HTTPS_PATTERN = /^https:\/\//;
+const HTTPS_PATTERN = /^https:\/\/[^\s\\/?#@]+(?:[/?#][^\s\\]*)?$/;
 const ARCHIFY_RANGE_PATTERN = /^(\^|~)\d+\.\d+\.\d+$|^\d+\.\d+\.\d+$|^>=\d+\.\d+\.\d+ <\d+\.\d+\.\d+$/;
 const TAG_PATTERN = /^[a-z0-9-]{1,32}$/;
 
@@ -29,7 +29,24 @@ function isString(value) {
 }
 
 function isHttpsUrl(value) {
-  return isString(value) && HTTPS_PATTERN.test(value);
+  if (!isString(value) || /[\s\\\u0000-\u001f\u007f]/.test(value) || !HTTPS_PATTERN.test(value)) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !!url.hostname && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+// JSON Schema measures strings in Unicode code points, not UTF-16 units.
+function textLength(value) {
+  return [...value].length;
+}
+
+function unknownFields(value, allowed, subject, fail) {
+  for (const key of Object.keys(value)) {
+    if (!allowed.includes(key)) fail(`${subject}: unknown field "${key}".`);
+  }
 }
 
 export function validatePackage(value) {
@@ -57,15 +74,18 @@ export function validatePackage(value) {
   if (!isPlainObject(value.summary)) {
     fail('summary must be an object with "en" and "zh" strings.');
   } else {
+    unknownFields(value.summary, ['en', 'zh'], 'summary', fail);
     const { en, zh } = value.summary;
-    if (!isString(en) || en.length < 10 || en.length > 160) fail('summary.en must be 10-160 characters.');
-    if (!isString(zh) || zh.length < 6 || zh.length > 120) fail('summary.zh must be 6-120 characters.');
+    if (!isString(en) || textLength(en) < 10 || textLength(en) > 160) fail('summary.en must be 10-160 characters.');
+    if (!isString(zh) || textLength(zh) < 6 || textLength(zh) > 120) fail('summary.zh must be 6-120 characters.');
   }
 
   if (!isPlainObject(value.author) || !isString(value.author.name) || !value.author.name.trim()) {
     fail('author must be an object with a non-empty "name".');
-  } else if ('url' in value.author && !isHttpsUrl(value.author.url)) {
-    fail('author.url must be an https:// URL.');
+  } else {
+    unknownFields(value.author, ['name', 'url'], 'author', fail);
+    if (textLength(value.author.name) > 80) fail('author.name must be at most 80 characters.');
+    if ('url' in value.author && !isHttpsUrl(value.author.url)) fail('author.url must be an https:// URL.');
   }
 
   if (!isHttpsUrl(value.repository)) fail('repository must be an https:// URL.');
@@ -101,6 +121,9 @@ export function validatePackage(value) {
       value.evidence.forEach((item, index) => {
         if (!isPlainObject(item) || !isString(item.label) || !item.label.trim() || !isHttpsUrl(item.url)) {
           fail(`evidence[${index}] must be {label: string, url: https:// URL}.`);
+        } else {
+          unknownFields(item, ['label', 'url'], `evidence[${index}]`, fail);
+          if (textLength(item.label) > 80) fail(`evidence[${index}].label must be at most 80 characters.`);
         }
       });
     }
@@ -109,28 +132,13 @@ export function validatePackage(value) {
   return failures;
 }
 
-export function validateRegistry(root = repoRoot) {
-  const packagesDir = path.join(root, 'community', 'packages');
+// Shared by the file-system validator and the website's build-time glob.
+export function validatePackageEntries(packageFiles) {
   const failures = [];
   const entries = [];
-  let files = [];
-  try {
-    files = fs.readdirSync(packagesDir).filter((entry) => entry.endsWith('.json')).sort();
-  } catch {
-    failures.push('community/packages/ is missing or unreadable.');
-    return { entries, failures };
-  }
-  if (files.length === 0) failures.push('community/packages/ contains no package metadata files.');
-
+  if (packageFiles.length === 0) failures.push('community/packages/ contains no package metadata files.');
   const seen = new Set();
-  for (const file of files) {
-    let value;
-    try {
-      value = JSON.parse(fs.readFileSync(path.join(packagesDir, file), 'utf8'));
-    } catch (error) {
-      failures.push(`${file}: not valid JSON (${error.message}).`);
-      continue;
-    }
+  for (const [file, value] of packageFiles) {
     for (const failure of validatePackage(value)) failures.push(`${file}: ${failure}`);
     if (isPlainObject(value)) {
       const expectedFile = `${value.name}.json`;
@@ -144,6 +152,27 @@ export function validateRegistry(root = repoRoot) {
     }
   }
   return { entries, failures };
+}
+
+export function validateRegistry(root = repoRoot) {
+  const packagesDir = path.join(root, 'community', 'packages');
+  let files;
+  try {
+    files = fs.readdirSync(packagesDir).filter((entry) => entry.endsWith('.json')).sort();
+  } catch {
+    return { entries: [], failures: ['community/packages/ is missing or unreadable.'] };
+  }
+  const parsed = [];
+  const failures = [];
+  for (const file of files) {
+    try {
+      parsed.push([file, JSON.parse(fs.readFileSync(path.join(packagesDir, file), 'utf8'))]);
+    } catch (error) {
+      failures.push(`${file}: not valid JSON (${error.message}).`);
+    }
+  }
+  const result = validatePackageEntries(parsed);
+  return { entries: result.entries, failures: [...failures, ...result.failures] };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

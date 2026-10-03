@@ -30,13 +30,13 @@
       "additionalProperties": false,
       "required": ["name"],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "maxLength": 80 },
-        "url": { "type": "string", "pattern": "^https://" }
+        "name": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "\\S" },
+        "url": { "type": "string", "pattern": "^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$", "format": "uri" }
       }
     },
     "repository": {
       "type": "string",
-      "pattern": "^https://",
+      "pattern": "^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$", "format": "uri",
       "description": "Public URL of the package source (git repository, npm page, or directory inside one)."
     },
     "archify": {
@@ -53,7 +53,7 @@
     },
     "homepage": {
       "type": "string",
-      "pattern": "^https://"
+      "pattern": "^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$", "format": "uri"
     },
     "tags": {
       "type": "array",
@@ -69,8 +69,8 @@
         "additionalProperties": false,
         "required": ["label", "url"],
         "properties": {
-          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
-          "url": { "type": "string", "pattern": "^https://" }
+          "label": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "\\S" },
+          "url": { "type": "string", "pattern": "^https://[^\\s\\\\/?#@]+(?:[/?#][^\\s\\\\]*)?$", "format": "uri" }
         }
       },
       "description": "Links to verification evidence: validation receipts, screenshots, rendered example artifacts. Evidence is authored by the submitter; Archify never executes third-party package code."

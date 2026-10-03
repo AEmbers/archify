@@ -32,7 +32,7 @@ Archify has **no in-process plugin API, and none is planned for this registry**.
 
 Review follows the tiers in [REVIEWING.md](../REVIEWING.md). Approval criteria:
 
-- Metadata passes `scripts/check-community-packages.mjs`.
+- Metadata passes `scripts/check-community-packages.mjs`. Links must be parseable HTTPS URLs with a host, no credentials, whitespace, control characters, or backslashes (the validator checks these URL semantics in addition to the schema). Website builds use the same validator and reject invalid entries.
 - The declared `archify` compatibility range exists and the supported `schemaVersions` are real.
 - The package performs what its summary claims, from the evidence you link.
 - No telemetry, no hosted-service requirement, no code execution inside Archify.

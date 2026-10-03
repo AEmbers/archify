@@ -79,3 +79,15 @@ test('community catalog: navigation, language toggle and disclaimer are present'
   const submission = elements(dom, 'a').find((node) => (attr(node, 'href') || '').includes('github.com/tt-a1i/archify/tree/main/community'));
   assert.ok(submission, 'must link to the submission guide');
 });
+
+
+test('community catalog: every evidence link preserves its registry label and URL', () => {
+  const cards = elements(communityDom(), 'article').filter(node => hasClass(node, 'package-card'));
+  assert.ok(registry.some(entry => entry.evidence?.length > 1), 'exercise a multi-evidence entry');
+  for (const entry of registry) {
+    const card = cards.find(node => elements(node, 'span').some(span => hasClass(span, 'package-name') && span.childNodes.some(child => child.value === entry.name)));
+    const evidence = elements(card, 'a').filter(node => hasClass(node, 'evidence-link'));
+    assert.deepEqual(evidence.map(node => ({ label: attr(node, 'data-en'), url: attr(node, 'href') })),
+      (entry.evidence || []).map(item => ({ label: `${item.label} ↗`, url: item.url })));
+  }
+});

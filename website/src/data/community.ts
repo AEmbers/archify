@@ -2,6 +2,7 @@
 // single source of truth; this page never hand-copies package metadata.
 // import.meta.glob is resolved by Vite at build time relative to this source
 // file, so the catalog cannot drift from the registry.
+import { validatePackageEntries } from '../../../scripts/check-community-packages.mjs';
 
 export const PACKAGE_TYPES = ['skill', 'recipe', 'brand-marks', 'locale', 'wrapper'] as const;
 export type PackageType = (typeof PACKAGE_TYPES)[number];
@@ -19,15 +20,13 @@ export interface CommunityPackage {
   evidence?: { label: string; url: string }[];
 }
 
-const modules = import.meta.glob<CommunityPackage>('../../../community/packages/*.json', { eager: true, import: 'default' });
-
-export const packages: CommunityPackage[] = Object.entries(modules)
-  .map(([file, value]) => {
-    if (!file.endsWith(`/${value.name}.json`)) {
-      throw new Error(`community registry: ${file} does not match name "${value.name}"`);
-    }
-    return value;
-  })
+const modules = import.meta.glob<unknown>('../../../community/packages/*.json', { eager: true, import: 'default' });
+const result = validatePackageEntries(Object.entries(modules).map(([file, value]) => [file.split('/').pop(), value]));
+if (result.failures.length) {
+  throw new Error(`community registry: ${result.failures.join('\n')}`);
+}
+// The runtime contract is checked before the typed view or PASS label is used.
+export const packages: CommunityPackage[] = (result.entries as CommunityPackage[])
   .sort((a, b) => a.name.localeCompare(b.name));
 
 export const typeOrder: PackageType[] = [...PACKAGE_TYPES];

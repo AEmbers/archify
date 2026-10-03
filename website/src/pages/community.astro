@@ -27,13 +27,13 @@ const activeTypes = typeOrder.filter((type) => typeCounts[type] > 0);
       <div class="shell hero-grid">
         <div>
           <div class="lead-label" data-en="Community registry / standalone packages" data-zh="社区注册表 / 独立包">Community registry / standalone packages</div>
-          <h1 data-en="Built on Archify.<br><em>Shared by everyone.</em>" data-zh="基于 Archify 构建，<br><em>由社区共享。</em>">Built on Archify.<br><em>Shared by everyone.</em></h1>
+          <h1 data-translation-html data-en="Built on Archify.<br><em>Shared by everyone.</em>" data-zh="基于 Archify 构建，<br><em>由社区共享。</em>">Built on Archify.<br><em>Shared by everyone.</em></h1>
           <p class="hero-copy" data-en="Community packages are standalone works that wrap the Archify CLI — skill packs, recipe libraries, brand kits, locales, and wrappers. Nothing here is a plugin: no third-party code ever runs inside the renderer." data-zh="社区包是围绕 Archify CLI 构建的独立产物——技能包、场景配方、品牌套件、语言包与命令行封装。这里没有插件：任何第三方代码都不会进入渲染器内部运行。">Community packages are standalone works that wrap the Archify CLI — skill packs, recipe libraries, brand kits, locales, and wrappers. Nothing here is a plugin: no third-party code ever runs inside the renderer.</p>
         </div>
         <div class="proof-board" aria-label="Registry summary">
-          <div class="proof-row"><span class="proof-value">{packages.length}</span><span class="proof-label" data-en="packages listed<br>from the registry" data-zh="个已收录包<br>来自注册表">packages listed<br>from the registry</span></div>
-          <div class="proof-row"><span class="proof-value">{activeTypes.length}</span><span class="proof-label" data-en="package types<br>in the catalog" data-zh="种包类型<br>收录中">package types<br>in the catalog</span></div>
-          <div class="proof-row"><span class="proof-value proof-status">PASS</span><span class="proof-label" data-en="metadata validated<br>deterministically" data-zh="元数据通过<br>确定性校验">metadata validated<br>deterministically</span></div>
+          <div class="proof-row"><span class="proof-value">{packages.length}</span><span class="proof-label" data-translation-html data-en="packages listed<br>from the registry" data-zh="个已收录包<br>来自注册表">packages listed<br>from the registry</span></div>
+          <div class="proof-row"><span class="proof-value">{activeTypes.length}</span><span class="proof-label" data-translation-html data-en="package types<br>in the catalog" data-zh="种包类型<br>收录中">package types<br>in the catalog</span></div>
+          <div class="proof-row"><span class="proof-value proof-status">PASS</span><span class="proof-label" data-translation-html data-en="metadata validated<br>deterministically" data-zh="元数据通过<br>确定性校验">metadata validated<br>deterministically</span></div>
         </div>
       </div>
     </section>
@@ -87,9 +87,9 @@ const activeTypes = typeOrder.filter((type) => typeCounts[type] > 0);
               </div>
               <div class="package-actions">
                 <a class="card-link" href={entry.repository} target="_blank" rel="noopener noreferrer" data-en="View source ↗" data-zh="查看源码 ↗">View source ↗</a>
-                {entry.evidence?.[0] && (
-                  <a class="card-link subtle" href={entry.evidence[0].url} target="_blank" rel="noopener noreferrer" data-en={`${entry.evidence[0].label} ↗`} data-zh={`${entry.evidence[0].label} ↗`}>{entry.evidence[0].label} ↗</a>
-                )}
+                {entry.evidence?.map((evidence) => (
+                  <a class="card-link subtle evidence-link" href={evidence.url} target="_blank" rel="noopener noreferrer" data-en={`${evidence.label} ↗`} data-zh={`${evidence.label} ↗`}>{evidence.label} ↗</a>
+                ))}
               </div>
             </article>
           ))}

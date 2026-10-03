@@ -83,3 +83,65 @@ test('community registry: rejects duplicate names and file/name mismatches', () 
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+
+test('community package: rejects nested unknown fields and overlong author/evidence text', () => {
+  for (const mutate of [
+    value => { value.summary.extra = true; },
+    value => { value.author.extra = true; },
+    value => { value.evidence = [{ label: 'receipt', url: 'https://example.com', extra: true }]; },
+    value => { value.author.name = 'x'.repeat(81); },
+    value => { value.evidence = [{ label: 'x'.repeat(81), url: 'https://example.com' }]; },
+  ]) {
+    const value = validPackage();
+    mutate(value);
+    assert.ok(validatePackage(value).length, JSON.stringify(value));
+  }
+});
+
+test('community package: rejects malformed HTTPS URLs in every link field', () => {
+  for (const url of ['https://', 'https:///example.com', 'https://example.com:bad', 'https://example.com/a b', 'https://user:secret@example.com', 'https://example.com/\\path', 'https://example.com/\npath', 'https://example.com/\n', 'https://example.com/\u0000path']) {
+    for (const mutate of [
+      value => { value.repository = url; },
+      value => { value.homepage = url; },
+      value => { value.author.url = url; },
+      value => { value.evidence = [{ label: 'receipt', url }]; },
+    ]) {
+      const value = validPackage();
+      mutate(value);
+      assert.ok(validatePackage(value).length, url);
+    }
+  }
+});
+
+test('community package: text lengths follow Unicode code points at schema boundaries', () => {
+  const value = validPackage();
+  value.author.name = '😀'.repeat(80);
+  value.summary.en = '😀'.repeat(160);
+  value.summary.zh = '😀'.repeat(120);
+  value.evidence = [{ label: '😀'.repeat(80), url: 'https://example.com/evidence' }];
+  assert.deepEqual(validatePackage(value), []);
+  value.author.name += '😀';
+  assert.ok(validatePackage(value).length);
+});
+
+
+test('community package: en/zh summaries and evidence labels enforce both length boundaries', () => {
+  for (const [field, minimum, maximum] of [['en', 10, 160], ['zh', 6, 120]]) {
+    for (const length of [minimum, maximum]) {
+      const value = validPackage();
+      value.summary[field] = '😀'.repeat(length);
+      assert.deepEqual(validatePackage(value), []);
+    }
+    for (const length of [minimum - 1, maximum + 1]) {
+      const value = validPackage();
+      value.summary[field] = '😀'.repeat(length);
+      assert.ok(validatePackage(value).length);
+    }
+  }
+  for (const length of [1, 80, 81]) {
+    const value = validPackage();
+    value.evidence = [{ label: '😀'.repeat(length), url: 'https://example.com/receipt' }];
+    assert.equal(validatePackage(value).length === 0, length <= 80);
+  }
+});
