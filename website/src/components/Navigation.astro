@@ -17,10 +17,12 @@ const links = [
   { page: 'start', en: 'Start', zh: '快速上手' },
   { page: 'community', en: 'Community', zh: '社区包' },
 ];
-// gallery/guide/start are deep-compared against the legacy docs/ baselines in
-// migration tests, so their navigation cannot change; the community link is
-// reachable from the index page and the community page itself.
-const visibleLinks = home || page === 'community' ? links : links.filter(link => link.page !== 'community');
+// The four baseline pages (index/gallery/guide/start) must keep identical
+// navigation: site-language continuity tests deep-compare nav metrics across
+// pages, and gallery/guide/start are deep-compared against the docs/
+// migration baselines. The community link lives on the community page itself
+// and in the index footer.
+const visibleLinks = page === 'community' ? links : links.filter(link => link.page !== 'community');
 ---
 <nav class="site-nav" aria-label="Primary navigation">
   <a class="nav-logo" href={home ? '#' : './'} aria-label={identity?.label}>

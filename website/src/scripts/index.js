@@ -61,7 +61,7 @@
       'cta-h':'Describe it once.<br><em>Share the map.</em>',
       'cta-sub':'One command installs the checked skill for Cursor, Claude Code, Codex, or OpenCode — and your next diagram is a chat message away.',
       'cta-install':'Install the skill',
-      'footer-changelog':'Changelog','footer-license':'License'
+      'footer-changelog':'Changelog','footer-license':'License','footer-community':'Community'
     },
     zh: {
       'nav-guide':'场景指南','nav-gallery':'验证作品集','nav-start':'快速上手','nav-community':'社区包','nav-install':'安装技能',
@@ -121,7 +121,7 @@
       'cta-h':'描述一次，<br><em>分享这张图。</em>',
       'cta-sub':'一条命令即可为 Cursor、Claude Code、Codex 或 OpenCode 安装经过检查的技能——你的下一张架构图，只差一句对话。',
       'cta-install':'安装技能',
-      'footer-changelog':'更新日志','footer-license':'许可证'
+      'footer-changelog':'更新日志','footer-license':'许可证','footer-community':'社区包'
     }
   };
 
