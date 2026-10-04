@@ -1,0 +1,10 @@
+{
+  "templateVersion": 1,
+  "repository": "tt-a1i/archify",
+  "number": 678,
+  "author": "tt-a1i",
+  "title": "docs: backport release subscription guidance to main (#677)",
+  "mergedAt": "2026-10-04T02:18:15Z",
+  "mergeCommit": "0680cb83c5c8a959a116a1e69e0db7b6ad309e73",
+  "url": "https://github.com/tt-a1i/archify/pull/678"
+}
