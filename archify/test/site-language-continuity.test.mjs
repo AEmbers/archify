@@ -562,7 +562,7 @@ test('real Chrome preserves language through entry, navigation, selection, refre
             var x = linkRect.x + linkRect.width / 2;
             var y = linkRect.y + linkRect.height / 2;
             return {
-              height: rect.height, left: rect.left, right: rect.right,
+              height: rect.height, left: rect.left, right: rect.right, pageWidth: document.documentElement.scrollWidth,
               communityLabel: community.textContent.trim(),
               language: document.documentElement.lang,
               active: nav.querySelector('[aria-current="page"]')?.getAttribute('href') || null,
@@ -577,6 +577,7 @@ test('real Chrome preserves language through entry, navigation, selection, refre
           assert.equal(mobile.height, 104, page);
           assert.equal(mobile.left, 0, page);
           assert.equal(mobile.right, width, page);
+          assert.ok(mobile.pageWidth <= width, `${page} ${language} ${width}: page must not overflow`);
           assert.equal(mobile.language, language === 'zh' ? 'zh-CN' : 'en', page);
           assert.equal(mobile.communityLabel, language === 'zh' ? '社区包' : 'Community', page);
           assert.equal(mobile.active, page === 'index.html' ? null : page, page);
