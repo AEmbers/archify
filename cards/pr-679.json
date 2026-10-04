@@ -1,0 +1,10 @@
+{
+  "templateVersion": 1,
+  "repository": "tt-a1i/archify",
+  "number": 679,
+  "author": "tt-a1i",
+  "title": "feat(community): backport registry catalog v0 to main (#674)",
+  "mergedAt": "2026-10-04T02:35:36Z",
+  "mergeCommit": "5ca54f976b7b3799df2e3bd33b624bf2194083a9",
+  "url": "https://github.com/tt-a1i/archify/pull/679"
+}
