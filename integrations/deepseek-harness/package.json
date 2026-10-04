@@ -1,6 +1,6 @@
 {
   "name": "@tt-a1i/archify-dsh",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Opt-in DeepSeek Harness Skill-only bundle for the Archify architecture-diagram skill.",
   "license": "MIT",
   "type": "module",
@@ -24,7 +24,8 @@
     "architecture-diagram"
   ],
   "engines": {
-    "node": "^22.19.0 || >=24.0.0"
+    "node": "^22.19.0 || >=24.0.0",
+    "dsh": ">=0.2.0-rc.1"
   },
   "repository": {
     "type": "git",
@@ -39,6 +40,14 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+      "compatibility": {
+        "dsh": ">=0.2.0-rc.1",
+        "dshReleases": {
+          "0.2.0-rc.1": "compatible",
+          "0.2.0-rc.2": "compatible",
+          "0.2.1-alpha.1": "compatible"
+        }
+      }
     }
-  }
 }
